@@ -5,9 +5,23 @@
 
 require('dotenv').config({ override: true });
 
+// ─── Startup env validation ───────────────────────────────────────────────────
+const REQUIRED_ENV_VARS = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_KEY',
+  'ANTHROPIC_API_KEY',
+];
+const missingVars = REQUIRED_ENV_VARS.filter((k) => !process.env[k]);
+if (missingVars.length > 0) {
+  console.error(`[Startup] FATAL: Missing required environment variables: ${missingVars.join(', ')}`);
+  process.exit(1);
+}
+
 const http = require('http');
+const cron = require('node-cron');
 const supabase = require('./config/supabase');
 const { setCorsHeaders, writeJson, notFound, internalError, getRequestUrl } = require('./utils/http');
+const { sendDailyNotifications } = require('./services/push-service');
 
 // Route modules — each exports an array of [method, pattern, handler, keys?] tuples
 const userRoutes = require('./routes/user');
@@ -135,3 +149,15 @@ server.listen(PORT, () => {
   console.log(`📡 API docs at http://localhost:${PORT}/`);
   console.log(`🔮 Health check at http://localhost:${PORT}/health\n`);
 });
+
+// ─── Cron jobs ────────────────────────────────────────────────────────────────
+// 08:30 Turkey time = 05:30 UTC (UTC+3)
+cron.schedule('30 5 * * *', async () => {
+  console.log('[Cron] Sending daily push notifications...');
+  try {
+    await sendDailyNotifications(supabase);
+    console.log('[Cron] Daily notifications complete.');
+  } catch (err) {
+    console.error('[Cron] Daily notification error:', err.message);
+  }
+}, { timezone: 'UTC' });

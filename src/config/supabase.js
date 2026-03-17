@@ -12,7 +12,7 @@ function buildHeaders(extra = {}) {
 function buildFilterQuery(filters) {
   const params = new URLSearchParams();
   for (const filter of filters) {
-    params.set(filter.column, `eq.${filter.value}`);
+    params.set(filter.column, filter.raw ? filter.value : `eq.${filter.value}`);
   }
   return params;
 }
@@ -55,6 +55,11 @@ class SupabaseQueryBuilder {
 
   eq(column, value) {
     this.filters.push({ column, value });
+    return this;
+  }
+
+  not(column, operator, value) {
+    this.filters.push({ column, value: `not.${operator}.${value}`, raw: true });
     return this;
   }
 

@@ -4,7 +4,7 @@ const supabase = require('../config/supabase');
 const { calculateDailyTransits } = require('../services/transit-calculator');
 const { generateDailyInsight, buildFallbackInsight } = require('../services/ai-interpreter');
 const { buildWhyTodayFeelsDifferent } = require('../services/cosmic-context');
-const { writeJson, internalError } = require('../utils/http');
+const { writeJson, internalError, badRequest } = require('../utils/http');
 
 async function getUserByDeviceId(deviceId) {
   const { data: user, error } = await supabase
@@ -139,7 +139,13 @@ async function handleDailyGet(_req, res, params, url) {
   }
 }
 
-async function handleDailyGenerateAll(_req, res) {
+async function handleDailyGenerateAll(req, res, _params, url) {
+  const apiKey = req.headers['x-cron-key'] || url.searchParams.get('key');
+  if (!process.env.CRON_API_KEY || apiKey !== process.env.CRON_API_KEY) {
+    writeJson(res, 401, { error: 'Unauthorized' });
+    return;
+  }
+
   try {
     const today = new Date().toISOString().split('T')[0];
     const { data: users, error } = await supabase.from('users').select('*');

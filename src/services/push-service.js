@@ -77,7 +77,7 @@ async function sendDailyNotifications(supabase) {
       await sendPushNotification(
         user.push_token,
         insight.notification_text,
-        '✨ Your Daily Insight',
+        '✨ Günlük İçgörün',
         { type: 'daily_insight', date: today }
       );
     }
