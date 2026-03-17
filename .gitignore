@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment secrets — never commit real values
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime
+pids/
+*.pid
+
+# Build output (if added later)
+dist/
+build/
