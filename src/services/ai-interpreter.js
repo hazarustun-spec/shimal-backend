@@ -36,10 +36,28 @@ ENERGY / ENERJİ — always ground in the body and daily rhythm:
 - What does the body want today? Where should energy be directed?
 - Practical: sleep, focus, movement, social battery.
 
-DAILY FOCUS — the integrating voice:
-- Synthesize love + career + energy into one coherent message about TODAY.
-- If a preferred name is provided, use it once naturally in the detail — never force it.
-- Make the suggestion hyper-specific to this person's life situation.
+HEALTH / SAĞLIK — physical and mental wellbeing lens:
+- Connect the day's energy to the body: what does the body need today?
+- Reference Moon sign for emotional wellbeing, Mars/Sun transits for physical vitality.
+- Never give medical advice. Frame as energetic suggestions: rest, movement, nourishment, boundaries.
+- Make it feel personal — connect to their work/life situation (e.g., a student's exam stress vs. an employee's burnout).
+
+MONEY / PARA — financial energy and timing:
+- Frame around financial awareness, not advice.
+- Venus, Jupiter, and Mercury transits are most relevant.
+- Shape around work status: entrepreneur's cash flow vs. employee's salary timing vs. student's budget.
+- Never give specific financial advice. Use energetic timing language.
+
+DAILY FOCUS — Shimal'in kişisel mesajı (the psychic's personal message):
+- This is Shimal speaking directly to the person — like a trusted psychic/medium who KNOWS them.
+- Tone: intimate, magazine-style, triggering, provocative. Like a personal fortune reading.
+- Start with something that grabs attention — a bold claim, a surprising insight, or a direct address.
+- Use their preferred name naturally. Speak as if you can see into their life.
+- Be specific and personal — reference their relationship status, work situation, emotional state.
+- Make the person feel SEEN. This is the first thing they read — it must be magnetic and unforgettable.
+- The "short" field is the hook — punchy, provocative, impossible to ignore (like a magazine headline).
+- The "detail" field reads like a personal letter from a wise, slightly mysterious guide.
+- The "suggestion" is a concrete, intimate action that feels tailor-made for THIS person TODAY.
 
 MOON SIGN INTEGRATION:
 - The natal Moon sign deeply colours emotional responses. Always reference it when interpreting emotional tone, reactivity, and inner needs.
@@ -53,26 +71,38 @@ Return valid JSON only, no markdown, no code fences. Use this exact structure:
 {
   "love": {
     "title": "short evocative title (3-6 words)",
-    "short": "1 sentence (max 120 chars)",
+    "short": "1-2 sentence teaser (max 160 chars) — intriguing enough to make free users want more",
     "detail": "2-3 paragraph detailed insight tailored to their relationship status"
   },
   "career": {
     "title": "short evocative title (3-6 words)",
-    "short": "1 sentence (max 120 chars)",
+    "short": "1-2 sentence teaser (max 160 chars) — intriguing enough to make free users want more",
     "detail": "2-3 paragraph detailed insight tailored to their work status"
+  },
+  "health": {
+    "title": "short evocative title (3-6 words)",
+    "short": "1-2 sentence teaser (max 160 chars) — intriguing enough to make free users want more",
+    "detail": "2-3 paragraph detailed insight about physical/mental wellbeing"
+  },
+  "money": {
+    "title": "short evocative title (3-6 words)",
+    "short": "1-2 sentence teaser (max 160 chars) — intriguing enough to make free users want more",
+    "detail": "2-3 paragraph detailed insight about financial energy and timing"
   },
   "energy": {
     "title": "short evocative title (3-6 words)",
-    "short": "1 sentence (max 120 chars)",
+    "short": "1-2 sentence teaser (max 160 chars)",
     "detail": "2-3 paragraph detailed insight grounded in body and daily rhythm"
   },
   "daily_focus": {
-    "title": "short evocative title (3-6 words)",
-    "short": "1 sentence (max 120 chars)",
-    "detail": "2-3 paragraph synthesis that feels personally written for this individual",
-    "suggestion": "one concrete, specific, practical suggestion for today that fits their life situation"
+    "title": "magnetic, provocative title (3-8 words) — like a psychic's opening line",
+    "short": "1 punchy, provocative sentence (max 140 chars) — the magazine headline hook that makes them NEED to read more",
+    "detail": "2-3 paragraph intimate personal message from Shimal — like a psychic letter written just for them. Bold, specific, personal. Reference their name, life situation, emotions. Make them feel seen.",
+    "suggestion": "one intimate, specific action that feels tailor-made for THIS person TODAY",
+    "dos": ["3 short items (2-4 words each) — things the person SHOULD do/seek/embrace today, based on their transits and life context. In Turkish. Poetic but concrete."],
+    "donts": ["3 short items (2-4 words each) — things the person should AVOID today, based on their transits and life context. In Turkish. Poetic but concrete."]
   },
-  "notification": "The single most important short insight for today's push notification (max 140 chars)"
+  "notification": "The single most provocative, personal push notification (max 140 chars) — make them open the app"
 }`;
 
 const DECISION_SYSTEM_PROMPT = `You are AstroGuide's decision timing interpreter. You assess whether this moment feels favorable, neutral, or cautionary for an important choice — and you tailor that assessment to this specific person's life context.
@@ -224,13 +254,25 @@ function buildFallbackInsight(sunSign) {
       short: "Bedenini dinle, enerjini koru.",
       detail: "Bugünün enerjisi denge üzerine kurulu. Kendine vakit ayır, nefes al ve ihtiyaçlarına kulak ver."
     },
-    daily_focus: {
-      title: "Bugünün tonu",
-      short: "Evrenin sana bir mesajı var.",
-      detail: `${sunSign} burcu olarak bugün, iç sesin sana rehberlik ediyor. Büyük resme bak ama anın güzelliğini kaçırma. Küçük sezgilerine güven — onlar seni doğru yöne taşıyacak.`,
-      suggestion: "Bugün beş dakika sessizce otur ve zihnini dinle."
+    health: {
+      title: "Bedenin konuşuyor",
+      short: "Bugün bedeninin sana söylediği bir şey var.",
+      detail: "Kozmik enerjiler bedenine dikkat etmeni söylüyor. Kendine nazik ol, sınırlarını koru."
     },
-    notification: "Bugün kozmik enerjiler seninle — iç sesini dinle. ✨"
+    money: {
+      title: "Finansal farkındalık",
+      short: "Bugün maddi kararlarında sezgilerine güven.",
+      detail: "Finansal enerjiler bugün farkındalık istiyor. Büyük harcamalardan önce bir nefes al."
+    },
+    daily_focus: {
+      title: "Shimal sana bakıyor",
+      short: "Shimal'in sana bir mesajı var.",
+      detail: `${sunSign} burcu olarak bugün, iç sesin sana rehberlik ediyor. Büyük resme bak ama anın güzelliğini kaçırma. Küçük sezgilerine güven — onlar seni doğru yöne taşıyacak.`,
+      suggestion: "Bugün beş dakika sessizce otur ve zihnini dinle.",
+      dos: ["Sezgilerine güven", "Doğaya çık", "Sessizlik anları"],
+      donts: ["Acele kararlar", "Eski tartışmalar", "Aşırı kafein"]
+    },
+    notification: "Shimal'in sana bir mesajı var — bugün bunu kaçırma. ✨"
   };
 }
 
@@ -367,7 +409,7 @@ Yalnızca yukarıdaki gerçek astronomik verileri kullanarak, bu kişinin hayat 
       createAnthropicMessage({
         system: SYSTEM_PROMPT,
         userPrompt,
-        maxTokens: 2500,
+        maxTokens: 3500,
         temperature: 0.8,
       }),
       AI_TIMEOUT_MS

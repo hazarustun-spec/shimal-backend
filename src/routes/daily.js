@@ -19,18 +19,24 @@ async function getUserByDeviceId(deviceId) {
 function applyPremiumGate(response, isPremium) {
   if (isPremium) return { ...response, is_premium: true };
 
-  const lockedSection = {
-    title: 'Premium içgörü',
-    short: "Bu bölümü okumak için Premium'a geç.",
-    detail: 'Bu içgörü premium üyelere özeldir. Aşk, kariyer ve enerji okumalarına erişmek için yükselt.',
+  // Free users see the teaser (short) but detail is locked
+  const lockDetail = (section) => {
+    if (!section) return section;
+    return {
+      title: section.title,
+      short: section.short,
+      detail: 'Premium içgörü — devamını okumak için Premium\'a geç.',
+    };
   };
 
   return {
     ...response,
     is_premium: false,
-    love: lockedSection,
-    career: lockedSection,
-    energy: lockedSection,
+    love: lockDetail(response.love),
+    career: lockDetail(response.career),
+    energy: lockDetail(response.energy),
+    health: lockDetail(response.health),
+    money: lockDetail(response.money),
   };
 }
 
@@ -59,6 +65,8 @@ async function handleDailyGet(_req, res, params, url) {
         love: existing.love,
         career: existing.career,
         energy: existing.energy,
+        health: existing.health || null,
+        money: existing.money || null,
         daily_focus: existing.daily_focus,
         notification_text: existing.notification_text,
         why_today_feels_different: buildWhyTodayFeelsDifferent(existing.transits_used || {}),
@@ -110,6 +118,8 @@ async function handleDailyGet(_req, res, params, url) {
         love: insight.love,
         career: insight.career,
         energy: insight.energy,
+        health: insight.health || null,
+        money: insight.money || null,
         daily_focus: insight.daily_focus,
         notification_text: insight.notification,
         transits_used: {
@@ -129,6 +139,8 @@ async function handleDailyGet(_req, res, params, url) {
       love: insight.love,
       career: insight.career,
       energy: insight.energy,
+      health: insight.health || null,
+      money: insight.money || null,
       daily_focus: insight.daily_focus,
       notification_text: insight.notification,
       why_today_feels_different: buildWhyTodayFeelsDifferent(transitData),
@@ -202,6 +214,8 @@ async function handleDailyGenerateAll(req, res, _params, url) {
           love: insight.love,
           career: insight.career,
           energy: insight.energy,
+          health: insight.health || null,
+          money: insight.money || null,
           daily_focus: insight.daily_focus,
           notification_text: insight.notification,
           transits_used: {
