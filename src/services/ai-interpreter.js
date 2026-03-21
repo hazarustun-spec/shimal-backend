@@ -155,7 +155,7 @@ Return valid JSON only, no markdown, no code fences. Use this exact structure:
   "best_approach_now": "one sentence — the most useful thing they can do or keep in mind today"
 }`;
 
-const AI_TIMEOUT_MS = 25000;
+const AI_TIMEOUT_MS = 60000;
 const MAX_RETRIES = 2;
 
 function withTimeout(promise, ms) {

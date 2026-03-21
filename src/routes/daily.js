@@ -106,8 +106,9 @@ async function handleDailyGet(_req, res, params, url) {
         yesterdayFocus: yesterdayInsight?.daily_focus?.short || null,
       });
     } catch (aiError) {
-      console.warn(`[Daily] AI generation failed, using fallback: ${aiError.message}`);
+      console.error(`[Daily] AI generation failed, using fallback. Error: ${aiError.message}\nStack: ${aiError.stack}`);
       insight = buildFallbackInsight(user.sun_sign);
+      insight._aiError = aiError.message; // Include error in response for debugging
     }
 
     const { error: insertError } = await supabase
