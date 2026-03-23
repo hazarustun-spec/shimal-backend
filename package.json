@@ -1,18 +1,17 @@
 {
-  "name": "astroguide-backend",
+  "name": "shimal-backend",
   "version": "1.0.0",
-  "description": "AstroGuide backend - real astrology data + AI interpretation",
+  "description": "Shimal backend - real astrology data + AI interpretation",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node src/index.js"
+    "dev": "node src/index.js",
+    "test": "node test/basic.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@supabase/supabase-js": "^2.49.1",
-    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express-rate-limit": "^8.3.1",
     "node-cron": "^3.0.3"
   },
   "optionalDependencies": {

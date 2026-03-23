@@ -13,7 +13,7 @@ const ONESIGNAL_API_URL = 'https://onesignal.com/api/v1';
  * @param {string} heading - Notification title
  * @param {object} data - Additional data payload
  */
-async function sendPushNotification(playerId, message, heading = 'AstroGuide', data = {}) {
+async function sendPushNotification(playerId, message, heading = 'Shimal', data = {}) {
   if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_API_KEY) {
     console.log('[Push] OneSignal not configured, skipping notification');
     return null;

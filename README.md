@@ -1,4 +1,4 @@
-# AstroGuide Backend
+# Shimal Backend
 
 Express.js backend that calculates real astrological data using Swiss Ephemeris and generates personalized daily insights using Claude AI.
 

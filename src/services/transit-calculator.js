@@ -48,27 +48,29 @@ function calculateDailyTransits(natalPlanets) {
  * Build a text summary of transits for AI interpretation
  */
 function buildTransitSummary(transits, retrogrades, aspects) {
+  const { toTR } = require('../utils/zodiac-tr');
+  const planetTR = (p) => ({ Sun:'Güneş', Moon:'Ay', Mercury:'Merkür', Venus:'Venüs', Mars:'Mars', Jupiter:'Jüpiter', Saturn:'Satürn', Uranus:'Uranüs', Neptune:'Neptün', Pluto:'Plüton', 'Transit Sun':'Transit Güneş', 'Transit Moon':'Transit Ay', 'Transit Mercury':'Transit Merkür', 'Transit Venus':'Transit Venüs', 'Transit Mars':'Transit Mars', 'Transit Jupiter':'Transit Jüpiter', 'Transit Saturn':'Transit Satürn', 'Transit Uranus':'Transit Uranüs', 'Transit Neptune':'Transit Neptün', 'Transit Pluto':'Transit Plüton', 'Natal Sun':'Natal Güneş', 'Natal Moon':'Natal Ay', 'Natal Mercury':'Natal Merkür', 'Natal Venus':'Natal Venüs', 'Natal Mars':'Natal Mars', 'Natal Jupiter':'Natal Jüpiter', 'Natal Saturn':'Natal Satürn', 'Natal Uranus':'Natal Uranüs', 'Natal Neptune':'Natal Neptün', 'Natal Pluto':'Natal Plüton' }[p] || p);
+  const aspectTR = (a) => ({ conjunction:'Kavuşum', opposition:'Karşıt', trine:'Üçgen', square:'Kare', sextile:'Altıgen' }[a] || a);
+  const natureTR = (n) => ({ harmonious:'uyumlu', challenging:'zorlayıcı', powerful:'güçlü' }[n] || n);
+
   const lines = [];
 
-  // Current planet positions
-  lines.push('=== Current Transits ===');
+  lines.push('=== Güncel Transitler ===');
   for (const [name, data] of Object.entries(transits)) {
-    const rx = data.isRetrograde ? ' (Retrograde)' : '';
-    lines.push(`${name} in ${data.sign} ${data.degree}°${rx}`);
+    const rx = data.isRetrograde ? ' (Retro)' : '';
+    lines.push(`${planetTR(name)} ${toTR(data.sign)} burcunda ${data.degree}°${rx}`);
   }
 
-  // Retrogrades
   if (retrogrades.length > 0) {
-    lines.push('\n=== Currently Retrograde ===');
-    retrogrades.forEach(r => lines.push(`${r.planet} retrograde in ${r.sign}`));
+    lines.push('\n=== Retrograd Gezegenler ===');
+    retrogrades.forEach(r => lines.push(`${planetTR(r.planet)} ${toTR(r.sign)} burcunda retrograd`));
   }
 
-  // Significant aspects to natal chart
   if (aspects.length > 0) {
-    lines.push('\n=== Transit-to-Natal Aspects ===');
-    const topAspects = aspects.slice(0, 10); // Top 10 tightest aspects
+    lines.push('\n=== Transit-Natal Açıları ===');
+    const topAspects = aspects.slice(0, 10);
     topAspects.forEach(a => {
-      lines.push(`${a.planet1} ${a.symbol} ${a.planet2} (${a.aspect}, orb ${a.orb}°, ${a.nature})`);
+      lines.push(`${planetTR(a.planet1)} ${a.symbol} ${planetTR(a.planet2)} (${aspectTR(a.aspect)}, orb ${a.orb}°, ${natureTR(a.nature)})`);
     });
   }
 

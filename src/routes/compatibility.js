@@ -4,6 +4,8 @@ const { calcAllPlanets } = require('../services/ephemeris');
 const { calculateCompatibility } = require('../services/transit-timeline');
 const { findAspect } = require('../utils/aspects');
 const { readJsonBody, writeJson, badRequest, internalError } = require('../utils/http');
+const { isValidBirthDate, isValidBirthTime } = require('../utils/validate');
+const { toTR } = require('../utils/zodiac-tr');
 
 const SYNASTRY_PLANETS = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn'];
 
@@ -79,8 +81,17 @@ async function handleCompatibility(req, res) {
   try {
     const body = await readJsonBody(req);
     const { birthDate1, birthTime1, birthDate2, birthTime2, name2 } = body;
-    if (!birthDate1 || !birthDate2) {
-      return badRequest(res, 'Both birth dates are required.');
+    if (!birthDate1 || !isValidBirthDate(birthDate1)) {
+      return badRequest(res, 'Valid birthDate1 is required (YYYY-MM-DD)');
+    }
+    if (!birthDate2 || !isValidBirthDate(birthDate2)) {
+      return badRequest(res, 'Valid birthDate2 is required (YYYY-MM-DD)');
+    }
+    if (birthTime1 && !isValidBirthTime(birthTime1)) {
+      return badRequest(res, 'Geçersiz doğum saati 1 (SS:DD)');
+    }
+    if (birthTime2 && !isValidBirthTime(birthTime2)) {
+      return badRequest(res, 'Geçersiz doğum saati 2 (SS:DD)');
     }
 
     const chart1 = calcAllPlanets(parseBirthDateTime(birthDate1, birthTime1));
@@ -95,21 +106,21 @@ async function handleCompatibility(req, res) {
       romanticPotential: compat.categories.romantic,
       friendshipScore: compat.categories.friendship,
       person1: {
-        sunSign: chart1.Sun.sign,
-        moonSign: chart1.Moon.sign,
+        sunSign: toTR(chart1.Sun.sign),
+        moonSign: toTR(chart1.Moon.sign),
         planets: extractPlanets(chart1),
       },
       person2: {
         name: name2 || '',
-        sunSign: chart2.Sun.sign,
-        moonSign: chart2.Moon.sign,
+        sunSign: toTR(chart2.Sun.sign),
+        moonSign: toTR(chart2.Moon.sign),
         planets: extractPlanets(chart2),
       },
       synastryAspects,
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    internalError(res, error, '[Compatibility] Error:', 'Failed to calculate compatibility.');
+    internalError(res, error, '[Compatibility] Error:', 'Uyumluluk hesaplanamadı');
   }
 }
 

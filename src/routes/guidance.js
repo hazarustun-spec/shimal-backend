@@ -3,7 +3,10 @@
 const supabase = require('../config/supabase');
 const { calculateDailyTransits } = require('../services/transit-calculator');
 const { generateDecisionGuidance } = require('../services/ai-interpreter');
-const { readJsonBody, writeJson, badRequest, internalError } = require('../utils/http');
+const { readJsonBody, writeJson, badRequest, internalError, checkOwnership } = require('../utils/http');
+const { isValidDeviceId, isValidText } = require('../utils/validate');
+const { toTR } = require('../utils/zodiac-tr');
+const { checkContent } = require('../utils/content-guard');
 
 async function getUserByDeviceId(deviceId) {
   const { data: user, error } = await supabase
@@ -25,8 +28,24 @@ async function handleDecisionGuidance(req, res) {
       preferredName = '',
     } = body;
 
-    if (!deviceId || !category) {
-      return badRequest(res, 'deviceId and category are required');
+    if (!deviceId || !isValidDeviceId(deviceId)) {
+      return badRequest(res, 'Valid deviceId is required');
+    }
+    if (!checkOwnership(req, res, deviceId)) return;
+    if (!category) {
+      return badRequest(res, 'category is required');
+    }
+    if (question && !isValidText(question, 500)) {
+      return badRequest(res, 'question must be under 500 characters');
+    }
+
+    // Content moderation
+    if (question) {
+      const guard = checkContent(question);
+      if (!guard.safe) {
+        writeJson(res, 400, { error: guard.reason });
+        return;
+      }
     }
 
     const validCategories = ['love', 'career', 'money', 'communication', 'personal'];
@@ -34,13 +53,9 @@ async function handleDecisionGuidance(req, res) {
       return badRequest(res, `Invalid category. Must be one of: ${validCategories.join(', ')}`);
     }
 
-    if (question && typeof question === 'string' && question.length > 500) {
-      return badRequest(res, 'Question must be 500 characters or fewer.');
-    }
-
     const user = await getUserByDeviceId(deviceId);
     if (!user) {
-      writeJson(res, 404, { error: 'User not found. Please complete onboarding first.' });
+      writeJson(res, 404, { error: 'Kullanıcı bulunamadı. Lütfen önce kayıt olun.' });
       return;
     }
 
@@ -59,8 +74,8 @@ async function handleDecisionGuidance(req, res) {
       gender: user.gender,
       relationshipStatus: user.relationship_status,
       workStatus: user.work_status,
-      sunSign: user.sun_sign,
-      moonSign: user.moon_sign,
+      sunSign: toTR(user.sun_sign),
+      moonSign: toTR(user.moon_sign),
       preferredName,
     });
 
@@ -74,7 +89,7 @@ async function handleDecisionGuidance(req, res) {
       generated_at: new Date().toISOString(),
     });
   } catch (error) {
-    internalError(res, error, '[Guidance] Decision guidance error:', 'Failed to generate decision guidance');
+    internalError(res, error, '[Guidance] Decision guidance error:', 'Karar rehberliği oluşturulamadı');
   }
 }
 

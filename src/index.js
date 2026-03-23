@@ -1,5 +1,5 @@
 /**
- * AstroGuide Backend Server
+ * Shimal Backend Server
  * Native Node HTTP server. All route handlers live in src/routes/*.
  */
 
@@ -20,16 +20,19 @@ if (missingVars.length > 0) {
 const http = require('http');
 const cron = require('node-cron');
 const supabase = require('./config/supabase');
-const { setCorsHeaders, writeJson, notFound, internalError, getRequestUrl } = require('./utils/http');
+const { setSecurityHeaders, checkApiKey, writeJson, notFound, internalError, getRequestUrl } = require('./utils/http');
+const { checkRateLimit } = require('./utils/rate-limit');
 const { sendDailyNotifications } = require('./services/push-service');
 
 // Route modules — each exports an array of [method, pattern, handler, keys?] tuples
+const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const dailyRoutes = require('./routes/daily');
 const guidanceRoutes = require('./routes/guidance');
 const transitRoutes = require('./routes/transits');
 const cosmicWeatherRoutes = require('./routes/cosmic-weather');
 const compatibilityRoutes = require('./routes/compatibility');
+const geomagneticRoutes = require('./routes/geomagnetic');
 const demoRoutes = require('./routes/demo');
 
 const PORT = Number(process.env.PORT || 3000);
@@ -46,7 +49,7 @@ process.on('unhandledRejection', (reason) => {
 
 async function handleRoot(_req, res) {
   writeJson(res, 200, {
-    name: 'AstroGuide API',
+    name: 'Shimal API',
     version: '1.0.0',
     endpoints: {
       health: 'GET /health',
@@ -63,6 +66,7 @@ async function handleRoot(_req, res) {
       compatibility: 'POST /api/transits/compatibility',
       cosmicWeather: 'GET /api/cosmic-weather',
       compatibilityLite: 'POST /api/compatibility',
+      geomagnetic: 'GET /api/geomagnetic?lat=41.0&lon=29.0',
     },
   });
 }
@@ -70,7 +74,7 @@ async function handleRoot(_req, res) {
 async function handleHealth(_req, res) {
   const health = {
     status: 'ok',
-    service: 'astroguide-backend',
+    service: 'shimal-backend',
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
   };
@@ -95,19 +99,21 @@ async function handleHealth(_req, res) {
 const routes = [
   ['GET', /^\/$/, handleRoot],
   ['GET', /^\/health$/, handleHealth],
+  ...authRoutes,
   ...userRoutes,
   ...dailyRoutes,
   ...guidanceRoutes,
   ...transitRoutes,
   ...cosmicWeatherRoutes,
   ...compatibilityRoutes,
+  ...geomagneticRoutes,
   ...demoRoutes,
 ];
 
 // ─── Request dispatcher ───────────────────────────────────────────────────────
 
 async function routeRequest(req, res) {
-  setCorsHeaders(res);
+  setSecurityHeaders(res);
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -117,6 +123,17 @@ async function routeRequest(req, res) {
 
   const url = getRequestUrl(req);
   console.log(`[${new Date().toISOString()}] ${req.method} ${url.pathname}`);
+
+  // Rate limiting (all /api/* endpoints)
+  if (!checkRateLimit(req, res, url.pathname)) return;
+
+  // API key check (skip public routes and cron endpoint which has its own auth)
+  const isPublic = url.pathname === '/' || url.pathname === '/health';
+  const isCron = url.pathname === '/api/daily/generate-all';
+  const isDemo = url.pathname.startsWith('/api/demo/');
+  if (!isPublic && !isCron && !isDemo) {
+    if (!checkApiKey(req, res)) return;
+  }
 
   for (const route of routes) {
     const [method, pattern, handler, keys = []] = route;
@@ -140,12 +157,12 @@ async function routeRequest(req, res) {
 
 const server = http.createServer((req, res) => {
   routeRequest(req, res).catch((error) => {
-    internalError(res, error, '[HTTP] Unhandled route error:', 'Internal server error');
+    internalError(res, error, '[HTTP] Unhandled route error:', 'Sunucu hatası oluştu');
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`\n✨ AstroGuide Backend running on http://localhost:${PORT}`);
+  console.log(`\n✨ Shimal Backend running on http://localhost:${PORT}`);
   console.log(`📡 API docs at http://localhost:${PORT}/`);
   console.log(`🔮 Health check at http://localhost:${PORT}/health\n`);
 });

@@ -6,12 +6,14 @@ const {
   calcAllPlanets,
   calcNatalChart,
 } = require('../services/ephemeris');
+const { toTR } = require('../utils/zodiac-tr');
 const {
   buildTransitTimeline,
   getCurrentMoonPhase,
   calculateCompatibility,
 } = require('../services/transit-timeline');
 const { readJsonBody, writeJson, badRequest, internalError } = require('../utils/http');
+const { isValidBirthDate, isValidBirthTime } = require('../utils/validate');
 
 function parseBirthDateTime(birthDate, birthTime = '12:00') {
   const [year, month, day] = birthDate.split('-').map(Number);
@@ -39,7 +41,7 @@ async function handleTransitsToday(_req, res) {
       retrogrades: retrogrades.map((item) => item.planet),
     });
   } catch (error) {
-    internalError(res, error, '[Transits] Error:', 'Failed to calculate transits');
+    internalError(res, error, '[Transits] Error:', 'Transit hesaplaması başarısız');
   }
 }
 
@@ -53,7 +55,7 @@ async function handleTransitsTimeline(_req, res, _params, url) {
       events,
     });
   } catch (error) {
-    internalError(res, error, '[Transits] Timeline error:', 'Failed to build transit timeline');
+    internalError(res, error, '[Transits] Timeline error:', 'Transit zaman çizelgesi oluşturulamadı');
   }
 }
 
@@ -65,7 +67,7 @@ async function handleMoonPhase(_req, res) {
       ...moonPhase,
     });
   } catch (error) {
-    internalError(res, error, '[Transits] Moon phase error:', 'Failed to calculate moon phase');
+    internalError(res, error, '[Transits] Moon phase error:', 'Ay fazı hesaplanamadı');
   }
 }
 
@@ -73,8 +75,11 @@ async function handleNatalChart(_req, res, _params, url) {
   try {
     const birthDate = url.searchParams.get('birthDate');
     const birthTime = url.searchParams.get('birthTime') || '12:00';
-    if (!birthDate) {
-      return badRequest(res, 'birthDate is required');
+    if (!birthDate || !isValidBirthDate(birthDate)) {
+      return badRequest(res, 'Valid birthDate is required (YYYY-MM-DD)');
+    }
+    if (birthTime !== '12:00' && !isValidBirthTime(birthTime)) {
+      return badRequest(res, 'Geçersiz doğum saati (SS:DD)');
     }
 
     const chart = calcNatalChart(parseBirthDateTime(birthDate, birthTime));
@@ -91,12 +96,12 @@ async function handleNatalChart(_req, res, _params, url) {
     }
 
     writeJson(res, 200, {
-      sunSign: chart.sunSign,
-      moonSign: chart.moonSign,
+      sunSign: toTR(chart.sunSign),
+      moonSign: toTR(chart.moonSign),
       planets,
     });
   } catch (error) {
-    internalError(res, error, '[Transits] Natal chart error:', 'Failed to calculate natal chart');
+    internalError(res, error, '[Transits] Natal chart error:', 'Doğum haritası hesaplanamadı');
   }
 }
 
@@ -104,19 +109,22 @@ async function handleTransitsCompatibility(req, res) {
   try {
     const body = await readJsonBody(req);
     const { birthDate1, birthTime1, birthDate2, birthTime2 } = body;
-    if (!birthDate1 || !birthDate2) {
-      return badRequest(res, 'Both birth dates are required');
+    if (!birthDate1 || !isValidBirthDate(birthDate1)) {
+      return badRequest(res, 'Valid birthDate1 is required (YYYY-MM-DD)');
+    }
+    if (!birthDate2 || !isValidBirthDate(birthDate2)) {
+      return badRequest(res, 'Valid birthDate2 is required (YYYY-MM-DD)');
     }
 
     const chart1 = calcAllPlanets(parseBirthDateTime(birthDate1, birthTime1));
     const chart2 = calcAllPlanets(parseBirthDateTime(birthDate2, birthTime2));
     const compatibility = calculateCompatibility(chart1, chart2);
-    compatibility.person1 = { sunSign: chart1.Sun.sign, moonSign: chart1.Moon.sign };
-    compatibility.person2 = { sunSign: chart2.Sun.sign, moonSign: chart2.Moon.sign };
+    compatibility.person1 = { sunSign: toTR(chart1.Sun.sign), moonSign: toTR(chart1.Moon.sign) };
+    compatibility.person2 = { sunSign: toTR(chart2.Sun.sign), moonSign: toTR(chart2.Moon.sign) };
 
     writeJson(res, 200, compatibility);
   } catch (error) {
-    internalError(res, error, '[Transits] Compatibility error:', 'Failed to calculate compatibility');
+    internalError(res, error, '[Transits] Compatibility error:', 'Uyumluluk hesaplanamadı');
   }
 }
 
@@ -125,5 +133,5 @@ module.exports = [
   ['GET', /^\/api\/transits\/timeline$/, handleTransitsTimeline],
   ['GET', /^\/api\/transits\/moon-phase$/, handleMoonPhase],
   ['GET', /^\/api\/transits\/natal-chart$/, handleNatalChart],
-  ['POST', /^\/api\/transits\/compatibility$/, handleTransitsCompatibility],
+  // Compatibility moved to /api/compatibility (compatibility.js) — single source of truth
 ];

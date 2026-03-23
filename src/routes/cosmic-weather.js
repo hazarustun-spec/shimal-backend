@@ -7,7 +7,7 @@ async function handleCosmicWeather(_req, res) {
   try {
     writeJson(res, 200, buildCosmicWeather());
   } catch (error) {
-    internalError(res, error, '[CosmicWeather] Error:', 'Failed to calculate cosmic weather.');
+    internalError(res, error, '[CosmicWeather] Error:', 'Kozmik hava hesaplanamadı');
   }
 }
 
