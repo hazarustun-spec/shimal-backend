@@ -86,11 +86,42 @@ async function handleDailyGet(req, res, params, url) {
     console.log(`[Daily] Generating insight for user ${user.id} (${user.sun_sign})`);
     const transitData = calculateDailyTransits(user.natal_planets);
 
+    const PLANET_TR = {
+      Sun:'Güneş', Moon:'Ay', Mercury:'Merkür', Venus:'Venüs', Mars:'Mars',
+      Jupiter:'Jüpiter', Saturn:'Satürn', Uranus:'Uranüs', Neptune:'Neptün', Pluto:'Plüton',
+      TrueNode:'Kuzey Düğüm', Chiron:'Chiron', Lilith:'Lilith',
+    };
+
     const natalLines = [];
+
+    // Ascendant / MC from stored natal data
+    const natalAsc = user.natal_planets?._ascendant;
+    const natalMC = user.natal_planets?._mc;
+    if (natalAsc) natalLines.push(`Yükselen ${toTR(natalAsc.sign)} burcunda ${natalAsc.degree}°`);
+    if (natalMC) natalLines.push(`MC ${toTR(natalMC.sign)} burcunda ${natalMC.degree}°`);
+
+    // Planet positions with house placements
     for (const [planet, data] of Object.entries(user.natal_planets)) {
+      if (planet.startsWith('_')) continue; // skip metadata keys
+      if (!data || !data.sign) continue;
       const rx = data.isRetrograde ? ' (Rx)' : '';
-      const planetTR = { Sun:'Güneş', Moon:'Ay', Mercury:'Merkür', Venus:'Venüs', Mars:'Mars', Jupiter:'Jüpiter', Saturn:'Satürn', Uranus:'Uranüs', Neptune:'Neptün', Pluto:'Plüton' }[planet] || planet;
-      natalLines.push(`${planetTR} ${toTR(data.sign)} burcunda ${data.degree}°${rx}`);
+      const house = data.house ? ` [Ev ${data.house}]` : '';
+      const planetTR = PLANET_TR[planet] || planet;
+      natalLines.push(`${planetTR} ${toTR(data.sign)} burcunda ${data.degree}°${rx}${house}`);
+    }
+
+    // Part of Fortune
+    const pof = user.natal_planets?._partOfFortune;
+    if (pof) natalLines.push(`Pars Fortuna ${toTR(pof.sign)} burcunda ${pof.degree}°`);
+
+    // Top natal aspects
+    const natalAspects = user.natal_planets?._natalAspects;
+    if (natalAspects && natalAspects.length > 0) {
+      natalLines.push('\nNatal Açılar:');
+      const top5 = natalAspects.slice(0, 5);
+      for (const a of top5) {
+        natalLines.push(`${a.planet1} ${a.symbol} ${a.planet2} (${a.aspect}, orb ${a.orb}°, ${a.nature})`);
+      }
     }
 
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
@@ -111,6 +142,7 @@ async function handleDailyGet(req, res, params, url) {
         workStatus: user.work_status,
         sunSign: toTR(user.sun_sign),
         moonSign: toTR(user.moon_sign),
+        ascendantSign: natalAsc?.sign || null,
         preferredName: url.searchParams.get('preferredName') || '',
         yesterdayFocus: yesterdayInsight?.daily_focus?.short || null,
       });
@@ -203,11 +235,37 @@ async function handleDailyGenerateAll(req, res, _params, url) {
         }
 
         const transitData = calculateDailyTransits(user.natal_planets);
+
+        const BATCH_PLANET_TR = {
+          Sun:'Güneş', Moon:'Ay', Mercury:'Merkür', Venus:'Venüs', Mars:'Mars',
+          Jupiter:'Jüpiter', Saturn:'Satürn', Uranus:'Uranüs', Neptune:'Neptün', Pluto:'Plüton',
+          TrueNode:'Kuzey Düğüm', Chiron:'Chiron', Lilith:'Lilith',
+        };
+
         const natalLines = [];
+        const batchAsc = user.natal_planets?._ascendant;
+        const batchMC = user.natal_planets?._mc;
+        if (batchAsc) natalLines.push(`Yükselen ${toTR(batchAsc.sign)} burcunda ${batchAsc.degree}°`);
+        if (batchMC) natalLines.push(`MC ${toTR(batchMC.sign)} burcunda ${batchMC.degree}°`);
+
         for (const [planet, data] of Object.entries(user.natal_planets)) {
+          if (planet.startsWith('_')) continue;
+          if (!data || !data.sign) continue;
           const rx = data.isRetrograde ? ' (Rx)' : '';
-          const planetTR = { Sun:'Güneş', Moon:'Ay', Mercury:'Merkür', Venus:'Venüs', Mars:'Mars', Jupiter:'Jüpiter', Saturn:'Satürn', Uranus:'Uranüs', Neptune:'Neptün', Pluto:'Plüton' }[planet] || planet;
-      natalLines.push(`${planetTR} ${toTR(data.sign)} burcunda ${data.degree}°${rx}`);
+          const house = data.house ? ` [Ev ${data.house}]` : '';
+          const planetTR = BATCH_PLANET_TR[planet] || planet;
+          natalLines.push(`${planetTR} ${toTR(data.sign)} burcunda ${data.degree}°${rx}${house}`);
+        }
+
+        const batchPof = user.natal_planets?._partOfFortune;
+        if (batchPof) natalLines.push(`Pars Fortuna ${toTR(batchPof.sign)} burcunda ${batchPof.degree}°`);
+
+        const batchNatalAspects = user.natal_planets?._natalAspects;
+        if (batchNatalAspects && batchNatalAspects.length > 0) {
+          natalLines.push('\nNatal Açılar:');
+          for (const a of batchNatalAspects.slice(0, 5)) {
+            natalLines.push(`${a.planet1} ${a.symbol} ${a.planet2} (${a.aspect}, orb ${a.orb}°, ${a.nature})`);
+          }
         }
 
         const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
@@ -226,6 +284,7 @@ async function handleDailyGenerateAll(req, res, _params, url) {
           workStatus: user.work_status,
           sunSign: toTR(user.sun_sign),
           moonSign: toTR(user.moon_sign),
+          ascendantSign: batchAsc?.sign || null,
           preferredName: user.preferred_name || '',
           yesterdayFocus: yesterdayInsight?.daily_focus?.short || null,
         });

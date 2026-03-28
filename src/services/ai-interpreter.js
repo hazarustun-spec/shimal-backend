@@ -45,6 +45,34 @@ GÜNLÜK ODAK — Shimal'in kişisel mesajı:
 - "suggestion": Bugün yapması gereken tek somut şey.
 
 AY BURCU: Natal Ay burcu duygusal tepkileri renklendirir. Transit Ay günlük ruh halini etkiler.
+
+YÜKSELEN BURÇ (ASCENDant): Kişinin dış dünyaya yansıttığı enerji, ilk izlenim, fiziksel enerji. Enerji ve günlük odak bölümlerinde yükselen burcun etkisini yansıt. Eğer yükselen burç verilmemişse bu bölümü atla.
+
+EV SİSTEMİ: Eğer gezegen ev yerleşimleri verilmişse, her bölümü ilgili evin temasıyla zenginleştir:
+- 1. ev: Kimlik, benlik ifadesi
+- 2. ev: Para, değerler, öz değer
+- 3. ev: İletişim, yakın çevre, kısa yolculuklar
+- 4. ev: Ev, aile, duygusal kökler
+- 5. ev: Aşk, yaratıcılık, çocuklar, eğlence
+- 6. ev: Sağlık, günlük rutinler, iş
+- 7. ev: İlişkiler, ortaklıklar
+- 8. ev: Dönüşüm, paylaşılan kaynaklar, derinlik
+- 9. ev: Felsefe, yolculuklar, yüksek öğrenim
+- 10. ev: Kariyer, toplumsal statü, otorite
+- 11. ev: Arkadaşlıklar, topluluk, gelecek vizyonu
+- 12. ev: Bilinçaltı, maneviyat, yalnızlık
+
+KUZEY DÜĞÜM (TrueNode): Ruhun büyüme yönü, karmik amaç. Günlük odakta derin bağlam olarak kullan.
+CHIRON: Yaralı şifacı — kişinin en hassas noktası ve iyileştirme potansiyeli. Sağlık/enerji bölümünde değerlendir.
+LİLİTH: Gölge taraf, bastırılmış güç. İnce bir şekilde kişisel büyüme bağlamında değerlendir.
+PARS FORTUNA: Doğal şans ve yetenek alanı.
+
+NATAL AÇILAR: Eğer natal gezegen-gezegen açıları verilmişse, kişinin temel karakter yapısını anlamak için kullan:
+- Güneş-Ay açısı: İç dünya ile irade arasındaki ilişki
+- Venüs-Mars açısı: Arzu ile çekim dinamiği
+- Satürn açıları: Disiplin, kısıtlama, olgunlaşma alanları
+Bu açıları günlük yorumlarda arka plan olarak kullan, aşırı teknik terminoloji kullanma.
+
 SÜREKLİLİK: Dünkü odak verilmişse enerji değişimini 1 cümle ile kabul et. Tekrar etme.
 
 ÇIKTI FORMATI — Yalnızca geçerli JSON döndür, markdown veya kod bloğu kullanma:
@@ -344,6 +372,7 @@ async function generateDailyInsight({
   workStatus,
   sunSign,
   moonSign,
+  ascendantSign,
   preferredName,
   yesterdayFocus,
 }) {
@@ -375,11 +404,14 @@ async function generateDailyInsight({
   const sunSignTR = toTR(sunSign);
   const moonSignTR = moonSign ? toTR(moonSign) : null;
 
+  const ascendantSignTR = ascendantSign ? toTR(ascendantSign) : null;
+
   const userPrompt = `Bu kişi için bugünün kişiselleştirilmiş astroloji içgörüsünü oluştur.
 
 KİŞİ:
 - Güneş burcu: ${sunSignTR}
 - Ay burcu: ${moonSignTR || 'Belirtilmemiş'}
+- Yükselen burcu: ${ascendantSignTR || 'Belirtilmemiş'}
 - Cinsiyet: ${gender}
 - İlişki durumu: ${relationshipStatus}
 - Çalışma durumu: ${workStatus}

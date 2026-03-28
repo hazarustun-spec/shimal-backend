@@ -18,6 +18,15 @@ const PLANETS = {
   Uranus: 7,
   Neptune: 8,
   Pluto: 9,
+  TrueNode: 11,   // North Node (Rahu)
+  Lilith: 12,      // Mean Black Moon Lilith (SE_MEAN_APOG)
+  Chiron: 15,      // Chiron
+};
+
+// Classic 10 planets (for backward-compatible summaries)
+const CLASSIC_PLANETS = {
+  Sun: 0, Moon: 1, Mercury: 2, Venus: 3, Mars: 4,
+  Jupiter: 5, Saturn: 6, Uranus: 7, Neptune: 8, Pluto: 9,
 };
 
 const PLANET_NAMES = Object.keys(PLANETS);
@@ -59,4 +68,4 @@ function getSignInfo(signName) {
   return SIGNS.find(s => s.name.toLowerCase() === signName.toLowerCase()) || null;
 }
 
-module.exports = { SIGNS, PLANETS, PLANET_NAMES, longitudeToSign, getSignInfo };
+module.exports = { SIGNS, PLANETS, CLASSIC_PLANETS, PLANET_NAMES, longitudeToSign, getSignInfo };

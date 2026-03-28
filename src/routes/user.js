@@ -28,7 +28,18 @@ async function handleUserRegister(req, res) {
       return badRequest(res, 'preferredName must be under 100 characters');
     }
 
-    const natalChart = buildNatalChart(birthDate, birthTime);
+    const natalChart = buildNatalChart(birthDate, birthTime, birthLatitude || null, birthLongitude || null);
+
+    // Store expanded natal data — underscore-prefixed keys for metadata
+    const natalPlanetsData = {
+      ...natalChart.planets,
+      _ascendant: natalChart.ascendant || null,
+      _mc: natalChart.mc || null,
+      _houses: natalChart.houses || null,
+      _houseSystem: natalChart.houseSystem || null,
+      _partOfFortune: natalChart.partOfFortune || null,
+      _natalAspects: natalChart.natalAspects || null,
+    };
 
     const userData = {
       device_id: deviceId,
@@ -43,7 +54,7 @@ async function handleUserRegister(req, res) {
       work_status: workStatus || 'not_specified',
       sun_sign: natalChart.sunSign,
       moon_sign: natalChart.moonSign,
-      natal_planets: natalChart.planets,
+      natal_planets: natalPlanetsData,
       updated_at: new Date().toISOString(),
     };
 
@@ -79,6 +90,7 @@ async function handleUserRegister(req, res) {
         id: user.id,
         sunSign: toTR(natalChart.sunSign),
         moonSign: toTR(natalChart.moonSign),
+        ascendantSign: natalChart.ascendantSign ? toTR(natalChart.ascendantSign) : null,
         natalSummary: natalChart.summary,
       },
     });

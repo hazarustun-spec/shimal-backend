@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@supabase/supabase-js": "^2.49.1",
     "dotenv": "^16.4.7",
+    "geo-tz": "^8.1.1",
     "node-cron": "^3.0.3"
   },
   "optionalDependencies": {
