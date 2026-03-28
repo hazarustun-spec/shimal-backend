@@ -210,10 +210,81 @@ async function handleUserDeletePost(req, res) {
   }
 }
 
+// ─── Migration: Recalculate natal charts for all users with lat/lon ──────────
+
+async function handleMigrateNatalCharts(req, res) {
+  try {
+    // Auth: use CRON_API_KEY for admin endpoints
+    const cronKey = req.headers['x-cron-key'] || '';
+    if (!cronKey || cronKey !== process.env.CRON_API_KEY) {
+      writeJson(res, 401, { error: 'Unauthorized' });
+      return;
+    }
+
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('id, device_id, birth_date, birth_time, birth_latitude, birth_longitude')
+      .not('birth_latitude', 'is', null)
+      .not('birth_longitude', 'is', null);
+
+    if (error) throw error;
+    if (!users || users.length === 0) {
+      writeJson(res, 200, { message: 'No users with coordinates found', migrated: 0 });
+      return;
+    }
+
+    let migrated = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const user of users) {
+      try {
+        const natalChart = buildNatalChart(
+          user.birth_date,
+          user.birth_time,
+          user.birth_latitude,
+          user.birth_longitude
+        );
+
+        const natalPlanetsData = {
+          ...natalChart.planets,
+          _ascendant: natalChart.ascendant || null,
+          _mc: natalChart.mc || null,
+          _houses: natalChart.houses || null,
+          _houseSystem: natalChart.houseSystem || null,
+          _partOfFortune: natalChart.partOfFortune || null,
+          _natalAspects: natalChart.natalAspects || null,
+        };
+
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            sun_sign: natalChart.sunSign,
+            moon_sign: natalChart.moonSign,
+            natal_planets: natalPlanetsData,
+          })
+          .eq('id', user.id);
+
+        if (updateError) throw updateError;
+        migrated++;
+      } catch (err) {
+        skipped++;
+        errors.push({ userId: user.id, error: err.message });
+      }
+    }
+
+    console.log(`[Migration] Natal chart recalculation: ${migrated} migrated, ${skipped} skipped`);
+    writeJson(res, 200, { migrated, skipped, total: users.length, errors: errors.slice(0, 10) });
+  } catch (error) {
+    internalError(res, error, '[Migration] Error:', 'Migration failed');
+  }
+}
+
 module.exports = [
   ['POST', /^\/api\/user\/register$/, handleUserRegister],
   ['PUT', /^\/api\/user\/push-token$/, handleUserPushToken],
   ['POST', /^\/api\/user\/delete$/, handleUserDeletePost],
+  ['POST', /^\/api\/user\/migrate-natal$/, handleMigrateNatalCharts],
   ['GET', /^\/api\/user\/([^/]+)$/, handleUserGet, ['deviceId']],
   ['DELETE', /^\/api\/user\/([^/]+)$/, handleUserDelete, ['deviceId']],
 ];
