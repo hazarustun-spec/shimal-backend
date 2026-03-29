@@ -186,9 +186,38 @@ function parseJSONResponse(text) {
   try {
     return JSON.parse(text);
   } catch (parseError) {
+    // Try to extract JSON from markdown fences or surrounding text
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch (_) {
+        // JSON was truncated (max_tokens hit) — try to repair
+        let truncated = jsonMatch[0];
+        // Close any open strings
+        const quoteCount = (truncated.match(/(?<!\\)"/g) || []).length;
+        if (quoteCount % 2 !== 0) truncated += '"';
+        // Close brackets/braces
+        const opens = (truncated.match(/[{[]/g) || []).length;
+        const closes = (truncated.match(/[}\]]/g) || []).length;
+        for (let i = 0; i < opens - closes; i++) {
+          // Check if last open was [ or {
+          const lastOpen = truncated.lastIndexOf('[') > truncated.lastIndexOf('{') ? ']' : '}';
+          truncated += lastOpen;
+        }
+        try {
+          return JSON.parse(truncated);
+        } catch (__) {
+          // Last resort: strip trailing incomplete values
+          truncated = truncated.replace(/,\s*"[^"]*"?\s*$/, '');
+          truncated = truncated.replace(/,\s*$/, '');
+          // Re-close
+          const o2 = (truncated.match(/[{[]/g) || []).length;
+          const c2 = (truncated.match(/[}\]]/g) || []).length;
+          for (let i = 0; i < o2 - c2; i++) truncated += '}';
+          return JSON.parse(truncated);
+        }
+      }
     }
     throw new Error(`Failed to parse AI response as JSON: ${parseError.message}`);
   }
@@ -506,9 +535,110 @@ Yalnızca yukarıdaki gerçek astrolojik verileri ve bu kişinin hayat bağlamı
   }
 }
 
+// ─── Personality Analysis ────────────────────────────────────────────────────
+
+const PERSONALITY_SYSTEM_PROMPT = `Sen Shimal'ın kişilik analizi motorusun. Kişinin doğum haritasına dayalı derin, detaylı ve kişiye özel bir kişilik profili oluşturuyorsun.
+
+DİL: Yanıtındaki HER kelime Türkçe olmalı. İngilizce kelime KULLANMA. Kesinlikle Korece, Japonca, Çince veya başka alfabe karakterleri kullanma — yalnızca Türk alfabesi (A-Z + Ğ Ü Ş İ Ö Ç). "때로" yerine "bazen", "zaman zaman" kullan.
+BURÇ İSİMLERİ: Koç, Boğa, İkizler, Yengeç, Aslan, Başak, Terazi, Akrep, Yay, Oğlak, Kova, Balık.
+
+YAZIM TARZI:
+- Sade, akıcı, samimi. "Sen" diye hitap et.
+- Astrolojik sembolleri pratik kişilik özelliklerine çevir.
+- Somut örnekler ver — "Sen toplantıda ilk konuşan kişisin" gibi.
+- Korku dili kullanma, kesin yargı verme.
+- Her gezegen yorumu en az 10 cümle olmalı. Derinlemesine ve detaylı yaz.
+- Gezegen burç ve ev kombinasyonunu birlikte yorumla.
+- Retrograd gezegenler varsa etkisini özellikle belirt.
+
+HER GEZEGEN İÇİN YORUM KURALLARI:
+
+☉ GÜNEŞ: Temel kimlik, irade, yaşam amacı, ego yapısı, liderlik tarzı, kendini ifade biçimi.
+☽ AY: Duygusal dünya, iç huzur kaynağı, anneyle ilişki, güvenlik ihtiyacı, stres tepkisi, ruh hali döngüsü.
+☿ MERKÜR: Düşünce yapısı, iletişim tarzı, öğrenme biçimi, karar verme süreci, mizah anlayışı.
+♀ VENÜS: Aşk dili, çekicilik, estetik anlayışı, para ile ilişki, değer sistemi, ilişkide ne aradığı.
+♂ MARS: Motivasyon kaynağı, öfke ifadesi, cinsel enerji, rekabet tarzı, harekete geçme biçimi.
+♃ JÜPİTER: Şans alanı, büyüme yönü, inanç sistemi, hayata bakış, cömertlik biçimi.
+♄ SATÜRN: Disiplin alanı, korkular, olgunlaşma teması, kariyer yapısı, otoriteyle ilişki.
+♅ URANÜS: Özgünlük, isyan noktası, yenilikçilik, beklenmedik değişimlerle başa çıkma.
+♆ NEPTÜN: Hayal gücü, sezgisel yetenek, sanatsal eğilim, kaçış mekanizması, spirituel yön.
+♇ PLÜTON: Dönüşüm alanı, güç dinamikleri, kontrol ihtiyacı, yeniden doğuş teması.
+☊ KUZEY DÜĞÜM: Ruhsal büyüme yönü, karmik amaç, bu hayatta öğrenmesi gereken ders.
+⚷ CHIRON: En derin yara, iyileştirme potansiyeli, başkalarına yardım gücü.
+
+GÜÇLÜ YÖNLER: Natal açılardan ve gezegen yerleşimlerinden 5-7 somut güçlü yön çıkar. Soyut değil, pratik ve gerçek hayata dokunan.
+GİZLİ ÖZELLİKLER: Kişinin farkında olmadığı ama haritasında açıkça görünen 5-7 özellik. Sürpriz etkisi yaratsın.
+
+EV SİSTEMİ: Gezegen hangi evdeyse, o evin temasını yoruma yansıt:
+1. ev: Kimlik | 2. ev: Değerler/para | 3. ev: İletişim | 4. ev: Ev/aile
+5. ev: Yaratıcılık/aşk | 6. ev: Sağlık/rutin | 7. ev: İlişkiler | 8. ev: Dönüşüm
+9. ev: Felsefe/yolculuk | 10. ev: Kariyer | 11. ev: Topluluk | 12. ev: Bilinçaltı
+
+ÇIKTI FORMATI — Yalnızca geçerli JSON döndür:
+{
+  "summary": "4-5 cümle genel kişilik profili. Kim olduğunu, nasıl hissettirdiğini, hayata nasıl yaklaştığını özetle.",
+  "planets": {
+    "Sun": { "title": "Güneş Burcun: [Burç Adı]", "sign": "[Burç]", "house": [ev numarası], "interpretation": "En az 10 cümle detaylı yorum..." },
+    "Moon": { "title": "Ay Burcun: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
+    "Mercury": { "title": "Merkür: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
+    "Venus": { "title": "Venüs: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
+    "Mars": { "title": "Mars: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
+    "Jupiter": { "title": "Jüpiter: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
+    "Saturn": { "title": "Satürn: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
+    "Uranus": { "title": "Uranüs: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
+    "Neptune": { "title": "Neptün: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
+    "Pluto": { "title": "Plüton: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
+    "TrueNode": { "title": "Kuzey Düğüm: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
+    "Chiron": { "title": "Chiron: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." }
+  },
+  "strengths": ["somut güçlü yön 1 (1-2 cümle açıklama)", "...", "...en az 5 madde"],
+  "hiddenTraits": ["gizli özellik 1 (1-2 cümle açıklama)", "...", "...en az 5 madde"]
+}`;
+
+/**
+ * Generate one-time personality analysis from natal chart
+ */
+async function generatePersonalityAnalysis({ natalSummary, gender, relationshipStatus, workStatus, sunSign, moonSign, ascendantSign, preferredName }) {
+  const safeName = sanitizeForAI(preferredName, 50);
+  const sunSignTR = toTR(sunSign);
+  const moonSignTR = moonSign ? toTR(moonSign) : null;
+  const ascendantSignTR = ascendantSign ? toTR(ascendantSign) : null;
+
+  const userPrompt = `Bu kişinin doğum haritasına dayalı kapsamlı kişilik analizi oluştur.
+
+KİŞİ:
+- Güneş burcu: ${sunSignTR}
+- Ay burcu: ${moonSignTR || 'Belirtilmemiş'}
+- Yükselen burcu: ${ascendantSignTR || 'Belirtilmemiş'}
+- Cinsiyet: ${gender}
+- İlişki durumu: ${relationshipStatus}
+- Çalışma durumu: ${workStatus}
+- İsim: ${safeName || 'Belirtilmemiş'}
+
+NATAL HARİTA (tüm gezegen konumları, evler, açılar):
+${natalSummary}
+
+Bu kişinin haritasındaki HER gezegen için en az 10 cümlelik derin, kişiye özel yorum yaz. Genel burç yorumu değil — bu kişinin spesifik gezegen-burç-ev kombinasyonuna dayalı benzersiz bir analiz olsun.`;
+
+  const PERSONALITY_TIMEOUT_MS = 300000; // 5 minutes — personality is a large one-time generation
+  return withRetry(async () => {
+    const text = await withTimeout(
+      createAnthropicMessage({
+        system: PERSONALITY_SYSTEM_PROMPT,
+        userPrompt,
+        maxTokens: 12000,
+        temperature: 0.7,
+      }),
+      PERSONALITY_TIMEOUT_MS
+    );
+    return parseJSONResponse(text);
+  }, 1); // Only 1 retry for personality (it's expensive)
+}
+
 module.exports = {
   generateDailyInsight,
   generateDecisionGuidance,
+  generatePersonalityAnalysis,
   buildFallbackInsight,
   buildFallbackDecisionGuidance,
 };
