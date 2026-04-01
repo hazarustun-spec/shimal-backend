@@ -54,6 +54,7 @@ async function handleUserRegister(req, res) {
       work_status: workStatus || 'not_specified',
       sun_sign: natalChart.sunSign,
       moon_sign: natalChart.moonSign,
+      ascendant_sign: natalChart.ascendantSign || null,
       natal_planets: natalPlanetsData,
       updated_at: new Date().toISOString(),
     };
@@ -264,6 +265,7 @@ async function handleMigrateNatalCharts(req, res) {
           .update({
             sun_sign: natalChart.sunSign,
             moon_sign: natalChart.moonSign,
+            ascendant_sign: natalChart.ascendantSign || null,
             natal_planets: natalPlanetsData,
           })
           .eq('id', user.id);

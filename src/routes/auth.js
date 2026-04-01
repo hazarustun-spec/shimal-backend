@@ -177,7 +177,7 @@ async function handleEmailVerifyOTP(req, res) {
     // Check if a user record already exists with this email (re-login or account recovery)
     const { data: existingUser } = await supabase
       .from('users')
-      .select('device_id, birth_date, birth_time, birth_place, birth_latitude, birth_longitude, preferred_name, gender, relationship_status, work_status, sun_sign, moon_sign, ascendant_sign')
+      .select('device_id, birth_date, birth_time, birth_place, birth_latitude, birth_longitude, preferred_name, gender, relationship_status, work_status, sun_sign, moon_sign, ascendant_sign, natal_planets')
       .eq('email', normalizedEmail)
       .maybeSingle();
 
@@ -206,7 +206,7 @@ async function handleEmailVerifyOTP(req, res) {
           workStatus: existingUser.work_status || 'not_specified',
           sunSign: existingUser.sun_sign || '',
           moonSign: existingUser.moon_sign || '',
-          ascendantSign: existingUser.ascendant_sign || '',
+          ascendantSign: existingUser.ascendant_sign || existingUser.natal_planets?._ascendant?.sign || '',
         }
       });
     }
