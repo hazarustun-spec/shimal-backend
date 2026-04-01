@@ -125,8 +125,13 @@ async function handleEmailSendOTP(req, res) {
 
     if (!ok) {
       const rawMessage = data?.msg || data?.error_description || data?.message || '';
-      console.error('[Auth] Email OTP failed:', rawMessage);
-      writeJson(res, 422, { error: 'Doğrulama kodu gönderilemedi. Lütfen tekrar deneyin.' });
+      const errorCode = data?.error_code || '';
+      console.error('[Auth] Email OTP failed:', rawMessage, errorCode);
+      if (errorCode === 'over_email_send_rate_limit' || data?.code === 429) {
+        writeJson(res, 429, { error: 'Çok fazla deneme yapıldı. Lütfen birkaç dakika bekleyip tekrar deneyin.' });
+      } else {
+        writeJson(res, 422, { error: 'Doğrulama kodu gönderilemedi. Lütfen tekrar deneyin.' });
+      }
       return;
     }
 

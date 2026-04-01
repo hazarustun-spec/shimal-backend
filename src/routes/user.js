@@ -163,7 +163,8 @@ async function handleUserDelete(req, res, params) {
       return;
     }
 
-    // Delete all daily insights for this user
+    // Delete all related data for this user
+    await supabase.from('feedback').delete().eq('user_id', user.id);
     await supabase.from('daily_insights').delete().eq('user_id', user.id);
 
     // Delete the user record
@@ -199,6 +200,8 @@ async function handleUserDeletePost(req, res) {
       return;
     }
 
+    // Delete all related data for this user
+    await supabase.from('feedback').delete().eq('user_id', user.id);
     await supabase.from('daily_insights').delete().eq('user_id', user.id);
     const { error: deleteError } = await supabase.from('users').delete().eq('id', user.id);
 
@@ -280,9 +283,43 @@ async function handleMigrateNatalCharts(req, res) {
   }
 }
 
+async function handleUserRefreshTime(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    const { deviceId, refreshHour, refreshMinute, timezone } = body;
+
+    if (!deviceId || !isValidDeviceId(deviceId)) {
+      return badRequest(res, 'Geçersiz cihaz kimliği');
+    }
+    if (!checkOwnership(req, res, deviceId)) return;
+
+    const hour   = Number(refreshHour);
+    const minute = Number(refreshMinute);
+    if (!Number.isInteger(hour)   || hour   < 0 || hour   > 23) return badRequest(res, 'Geçersiz saat (0-23)');
+    if (!Number.isInteger(minute) || minute < 0 || minute > 59) return badRequest(res, 'Geçersiz dakika (0-59)');
+
+    const tz = (typeof timezone === 'string' && timezone.length > 0 && timezone.length < 60)
+      ? timezone
+      : 'Europe/Istanbul';
+
+    const { error } = await supabase
+      .from('users')
+      .update({ refresh_hour: hour, refresh_minute: minute, timezone: tz })
+      .eq('device_id', deviceId);
+
+    if (error) throw error;
+
+    console.log(`[User] Refresh time set: ${deviceId} → ${hour}:${String(minute).padStart(2,'0')} (${tz})`);
+    writeJson(res, 200, { success: true });
+  } catch (error) {
+    internalError(res, error, '[User] Refresh time error:', 'Yenileme saati güncellenemedi');
+  }
+}
+
 module.exports = [
   ['POST', /^\/api\/user\/register$/, handleUserRegister],
   ['PUT', /^\/api\/user\/push-token$/, handleUserPushToken],
+  ['PUT', /^\/api\/user\/refresh-time$/, handleUserRefreshTime],
   ['POST', /^\/api\/user\/delete$/, handleUserDeletePost],
   ['POST', /^\/api\/user\/migrate-natal$/, handleMigrateNatalCharts],
   ['GET', /^\/api\/user\/([^/]+)$/, handleUserGet, ['deviceId']],

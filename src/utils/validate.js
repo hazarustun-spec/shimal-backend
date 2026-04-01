@@ -6,6 +6,7 @@ const DEVICE_ID_RE = /^[A-Fa-f0-9-]{8,64}$/;
 const BIRTH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const BIRTH_TIME_RE = /^\d{2}:\d{2}$/;
 const PHONE_RE = /^\+?\d{7,15}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_RE = /^\d{4,8}$/;
 
 // ─── Validators ───────────────────────────────────────────────────────────────
@@ -30,6 +31,10 @@ function isValidBirthTime(v) {
 
 function isValidPhone(v) {
   return typeof v === 'string' && PHONE_RE.test(v);
+}
+
+function isValidEmail(v) {
+  return typeof v === 'string' && v.length <= 254 && EMAIL_RE.test(v);
 }
 
 function isValidOtp(v) {
@@ -63,6 +68,7 @@ module.exports = {
   isValidBirthDate,
   isValidBirthTime,
   isValidPhone,
+  isValidEmail,
   isValidOtp,
   isValidText,
   sanitizeForAI,

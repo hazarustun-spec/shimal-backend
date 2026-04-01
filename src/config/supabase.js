@@ -53,6 +53,11 @@ class SupabaseQueryBuilder {
     return this;
   }
 
+  delete() {
+    this.action = 'delete';
+    return this;
+  }
+
   eq(column, value) {
     this.filters.push({ column, value });
     return this;
@@ -110,6 +115,16 @@ class SupabaseQueryBuilder {
       Prefer: this.returnRepresentation ? 'return=representation' : 'return=minimal',
       Accept: this.expectSingle ? 'application/vnd.pgrst.object+json' : 'application/json',
     });
+
+    if (this.action === 'delete') {
+      const deleteHeaders = buildHeaders({
+        Accept: 'application/json',
+      });
+      return parseSupabaseResponse(
+        await fetch(url, { method: 'DELETE', headers: deleteHeaders }),
+        false
+      );
+    }
 
     const method = this.action === 'insert' ? 'POST' : 'PATCH';
     return parseSupabaseResponse(

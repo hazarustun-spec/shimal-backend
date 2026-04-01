@@ -75,6 +75,8 @@ async function handleNatalChart(_req, res, _params, url) {
   try {
     const birthDate = url.searchParams.get('birthDate');
     const birthTime = url.searchParams.get('birthTime') || '12:00';
+    const lat = parseFloat(url.searchParams.get('lat')) || null;
+    const lon = parseFloat(url.searchParams.get('lon')) || null;
     if (!birthDate || !isValidBirthDate(birthDate)) {
       return badRequest(res, 'Valid birthDate is required (YYYY-MM-DD)');
     }
@@ -82,7 +84,7 @@ async function handleNatalChart(_req, res, _params, url) {
       return badRequest(res, 'Geçersiz doğum saati (SS:DD)');
     }
 
-    const chart = calcNatalChart(parseBirthDateTime(birthDate, birthTime));
+    const chart = calcNatalChart(parseBirthDateTime(birthDate, birthTime), lat, lon);
     const planets = {};
     for (const [name, data] of Object.entries(chart.planets)) {
       planets[name] = {
@@ -92,14 +94,39 @@ async function handleNatalChart(_req, res, _params, url) {
         symbol: data.symbol,
         element: data.element,
         isRetrograde: data.isRetrograde,
+        house: data.house || null,
       };
     }
 
-    writeJson(res, 200, {
+    const response = {
       sunSign: toTR(chart.sunSign),
       moonSign: toTR(chart.moonSign),
       planets,
-    });
+    };
+
+    // Add house system data if available (requires lat/lon)
+    if (chart.ascendant) {
+      response.ascendant = {
+        sign: chart.ascendant.sign,
+        degree: chart.ascendant.degree,
+        longitude: chart.ascendant.longitude,
+      };
+    }
+    if (chart.mc) {
+      response.mc = {
+        sign: chart.mc.sign,
+        degree: chart.mc.degree,
+        longitude: chart.mc.longitude,
+      };
+    }
+    if (chart.houses) {
+      response.houses = chart.houses;
+    }
+    if (chart.ascendantSign) {
+      response.ascendantSign = toTR(chart.ascendantSign);
+    }
+
+    writeJson(res, 200, response);
   } catch (error) {
     internalError(res, error, '[Transits] Natal chart error:', 'Doğum haritası hesaplanamadı');
   }

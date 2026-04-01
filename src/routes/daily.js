@@ -323,7 +323,93 @@ async function handleDailyGenerateAll(req, res, _params, url) {
   }
 }
 
+// ─── Shared helper: generate + save insight for one user ─────────────────────
+
+async function generateInsightForUser(user, today) {
+  // Skip if already generated today
+  const { data: existing } = await supabase
+    .from('daily_insights')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('date', today)
+    .maybeSingle();
+
+  if (existing) return 'skipped';
+
+  const PLANET_TR = {
+    Sun:'Güneş', Moon:'Ay', Mercury:'Merkür', Venus:'Venüs', Mars:'Mars',
+    Jupiter:'Jüpiter', Saturn:'Satürn', Uranus:'Uranüs', Neptune:'Neptün', Pluto:'Plüton',
+    TrueNode:'Kuzey Düğüm', Chiron:'Chiron', Lilith:'Lilith',
+  };
+
+  const transitData = calculateDailyTransits(user.natal_planets);
+  const natalLines = [];
+  const natalAsc = user.natal_planets?._ascendant;
+  const natalMC  = user.natal_planets?._mc;
+  if (natalAsc) natalLines.push(`Yükselen ${toTR(natalAsc.sign)} burcunda ${natalAsc.degree}°`);
+  if (natalMC)  natalLines.push(`MC ${toTR(natalMC.sign)} burcunda ${natalMC.degree}°`);
+
+  for (const [planet, data] of Object.entries(user.natal_planets)) {
+    if (planet.startsWith('_') || !data?.sign) continue;
+    const rx    = data.isRetrograde ? ' (Rx)' : '';
+    const house = data.house ? ` [Ev ${data.house}]` : '';
+    natalLines.push(`${PLANET_TR[planet] || planet} ${toTR(data.sign)} burcunda ${data.degree}°${rx}${house}`);
+  }
+
+  const pof = user.natal_planets?._partOfFortune;
+  if (pof) natalLines.push(`Pars Fortuna ${toTR(pof.sign)} burcunda ${pof.degree}°`);
+
+  const natalAspects = user.natal_planets?._natalAspects;
+  if (natalAspects?.length) {
+    natalLines.push('\nNatal Açılar:');
+    for (const a of natalAspects.slice(0, 5)) {
+      natalLines.push(`${a.planet1} ${a.symbol} ${a.planet2} (${a.aspect}, orb ${a.orb}°, ${a.nature})`);
+    }
+  }
+
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const { data: yesterdayInsight } = await supabase
+    .from('daily_insights')
+    .select('daily_focus')
+    .eq('user_id', user.id)
+    .eq('date', yesterday)
+    .maybeSingle();
+
+  const insight = await generateDailyInsight({
+    natalSummary:       natalLines.join('\n'),
+    transitSummary:     transitData.summary,
+    gender:             user.gender,
+    relationshipStatus: user.relationship_status,
+    workStatus:         user.work_status,
+    sunSign:            toTR(user.sun_sign),
+    moonSign:           toTR(user.moon_sign),
+    ascendantSign:      natalAsc?.sign || null,
+    preferredName:      user.preferred_name || '',
+    yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
+  });
+
+  await supabase.from('daily_insights').insert({
+    user_id:           user.id,
+    date:              today,
+    love:              insight.love,
+    career:            insight.career,
+    energy:            insight.energy,
+    health:            insight.health || null,
+    money:             insight.money || null,
+    daily_focus:       insight.daily_focus,
+    notification_text: insight.notification,
+    transits_used: {
+      retrogrades: transitData.retrogrades,
+      topAspects:  transitData.aspects.slice(0, 5),
+    },
+  });
+
+  return insight.notification || 'Bugünkü kozmik rehberliğin hazır.';
+}
+
 module.exports = [
   ['GET', /^\/api\/daily\/([^/]+)$/, handleDailyGet, ['deviceId']],
   ['POST', /^\/api\/daily\/generate-all$/, handleDailyGenerateAll],
 ];
+
+module.exports.generateInsightForUser = generateInsightForUser;
