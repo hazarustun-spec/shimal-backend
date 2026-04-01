@@ -6,6 +6,7 @@ const {
   calcAllPlanets,
   calcNatalChart,
 } = require('../services/ephemeris');
+const { buildNatalChart } = require('../services/natal-chart');
 const { toTR } = require('../utils/zodiac-tr');
 const {
   buildTransitTimeline,
@@ -84,7 +85,8 @@ async function handleNatalChart(_req, res, _params, url) {
       return badRequest(res, 'Geçersiz doğum saati (SS:DD)');
     }
 
-    const chart = calcNatalChart(parseBirthDateTime(birthDate, birthTime), lat, lon);
+    // buildNatalChart koordinatlardan timezone çevrimini doğru yapar (Siz sayfasıyla aynı mantık)
+    const chart = buildNatalChart(birthDate, birthTime, lat, lon);
     const planets = {};
     for (const [name, data] of Object.entries(chart.planets)) {
       planets[name] = {
