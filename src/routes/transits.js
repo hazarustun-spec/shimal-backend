@@ -15,6 +15,7 @@ const {
 } = require('../services/transit-timeline');
 const { readJsonBody, writeJson, badRequest, internalError } = require('../utils/http');
 const { isValidBirthDate, isValidBirthTime } = require('../utils/validate');
+const supabase = require('../config/supabase');
 
 function parseBirthDateTime(birthDate, birthTime = '12:00') {
   const [year, month, day] = birthDate.split('-').map(Number);
@@ -72,12 +73,39 @@ async function handleMoonPhase(_req, res) {
   }
 }
 
-async function handleNatalChart(_req, res, _params, url) {
+async function handleNatalChart(req, res, _params, url) {
   try {
-    const birthDate = url.searchParams.get('birthDate');
-    const birthTime = url.searchParams.get('birthTime') || '12:00';
-    const lat = parseFloat(url.searchParams.get('lat')) || null;
-    const lon = parseFloat(url.searchParams.get('lon')) || null;
+    // Prefer DB-stored birth data (guaranteed consistent with daily/Siz pages).
+    // Fall back to query params only when deviceId header is absent.
+    const deviceId = req.headers['x-device-id'];
+    let birthDate, birthTime, lat, lon;
+
+    if (deviceId) {
+      const { data: user } = await supabase
+        .from('users')
+        .select('birth_date, birth_time, birth_latitude, birth_longitude')
+        .eq('device_id', deviceId)
+        .maybeSingle();
+
+      if (user) {
+        birthDate = user.birth_date;
+        birthTime = user.birth_time || '12:00';
+        lat  = user.birth_latitude  ?? null;
+        lon  = user.birth_longitude ?? null;
+        console.log(`[NatalChart] Using DB data for ${deviceId}: ${birthDate} ${birthTime} (${lat},${lon})`);
+      }
+    }
+
+    // Fallback to query params if no user found
+    if (!birthDate) {
+      birthDate = url.searchParams.get('birthDate');
+      birthTime = url.searchParams.get('birthTime') || '12:00';
+      const rawLat = url.searchParams.get('lat');
+      const rawLon = url.searchParams.get('lon');
+      lat = rawLat != null ? (parseFloat(rawLat) || null) : null;
+      lon = rawLon != null ? (parseFloat(rawLon) || null) : null;
+    }
+
     if (!birthDate || !isValidBirthDate(birthDate)) {
       return badRequest(res, 'Valid birthDate is required (YYYY-MM-DD)');
     }
@@ -85,7 +113,7 @@ async function handleNatalChart(_req, res, _params, url) {
       return badRequest(res, 'Geçersiz doğum saati (SS:DD)');
     }
 
-    // buildNatalChart koordinatlardan timezone çevrimini doğru yapar (Siz sayfasıyla aynı mantık)
+    // buildNatalChart koordinatlardan timezone çevrimini doğru yapar (Siz/Bugün ile aynı mantık)
     const chart = buildNatalChart(birthDate, birthTime, lat, lon);
     const planets = {};
     for (const [name, data] of Object.entries(chart.planets)) {
