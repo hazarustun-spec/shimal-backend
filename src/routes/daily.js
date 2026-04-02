@@ -4,10 +4,96 @@ const supabase = require('../config/supabase');
 const { calculateDailyTransits } = require('../services/transit-calculator');
 const { generateDailyInsight, buildFallbackInsight } = require('../services/ai-interpreter');
 const { buildWhyTodayFeelsDifferent } = require('../services/cosmic-context');
+const { buildNatalChart } = require('../services/natal-chart');
 const { writeJson, internalError, badRequest, checkOwnership } = require('../utils/http');
 const { isValidDeviceId } = require('../utils/validate');
 
 const { toTR } = require('../utils/zodiac-tr');
+
+/**
+ * Always recalculate natal data fresh from birth fields (timezone-aware).
+ * This fixes stale `natal_planets` stored before the timezone-aware fix.
+ * Also silently updates the DB in the background so future reads are correct.
+ */
+function getFreshNatalData(user) {
+  if (!user.birth_date) {
+    return { natalPlanets: user.natal_planets || {}, ascSign: user.natal_planets?._ascendant?.sign || null };
+  }
+
+  try {
+    const natalChart = buildNatalChart(
+      user.birth_date,
+      user.birth_time || '12:00',
+      user.birth_latitude  || null,
+      user.birth_longitude || null,
+    );
+
+    const natalPlanets = {
+      ...natalChart.planets,
+      _ascendant:    natalChart.ascendant    || null,
+      _mc:           natalChart.mc           || null,
+      _houses:       natalChart.houses       || null,
+      _houseSystem:  natalChart.houseSystem  || null,
+      _partOfFortune: natalChart.partOfFortune || null,
+      _natalAspects: natalChart.natalAspects || null,
+    };
+
+    // Background DB update — fixes stale stored natal_planets without blocking the request
+    supabase.from('users')
+      .update({
+        natal_planets:  natalPlanets,
+        sun_sign:       natalChart.sunSign,
+        moon_sign:      natalChart.moonSign,
+        ascendant_sign: natalChart.ascendantSign || null,
+      })
+      .eq('id', user.id)
+      .then(() => {})
+      .catch((e) => console.warn(`[Daily] Background natal update failed for user ${user.id}:`, e.message));
+
+    return { natalPlanets, ascSign: natalChart.ascendantSign || null };
+  } catch (err) {
+    console.warn(`[Daily] Fresh natal chart failed for user ${user.id}, using stored data:`, err.message);
+    return {
+      natalPlanets: user.natal_planets || {},
+      ascSign: user.natal_planets?._ascendant?.sign || null,
+    };
+  }
+}
+
+const PLANET_TR = {
+  Sun:'Güneş', Moon:'Ay', Mercury:'Merkür', Venus:'Venüs', Mars:'Mars',
+  Jupiter:'Jüpiter', Saturn:'Satürn', Uranus:'Uranüs', Neptune:'Neptün', Pluto:'Plüton',
+  TrueNode:'Kuzey Düğüm', Chiron:'Chiron', Lilith:'Lilith',
+};
+
+function buildNatalLines(natalPlanets) {
+  const lines = [];
+
+  const asc = natalPlanets?._ascendant;
+  const mc  = natalPlanets?._mc;
+  if (asc) lines.push(`Yükselen ${toTR(asc.sign)} burcunda ${asc.degree}°`);
+  if (mc)  lines.push(`MC ${toTR(mc.sign)} burcunda ${mc.degree}°`);
+
+  for (const [planet, data] of Object.entries(natalPlanets)) {
+    if (planet.startsWith('_') || !data?.sign) continue;
+    const rx    = data.isRetrograde ? ' (Rx)' : '';
+    const house = data.house ? ` [Ev ${data.house}]` : '';
+    lines.push(`${PLANET_TR[planet] || planet} ${toTR(data.sign)} burcunda ${data.degree}°${rx}${house}`);
+  }
+
+  const pof = natalPlanets?._partOfFortune;
+  if (pof) lines.push(`Pars Fortuna ${toTR(pof.sign)} burcunda ${pof.degree}°`);
+
+  const aspects = natalPlanets?._natalAspects;
+  if (aspects?.length) {
+    lines.push('\nNatal Açılar:');
+    for (const a of aspects.slice(0, 5)) {
+      lines.push(`${a.planet1} ${a.symbol} ${a.planet2} (${a.aspect}, orb ${a.orb}°, ${a.nature})`);
+    }
+  }
+
+  return lines;
+}
 
 async function getUserByDeviceId(deviceId) {
   const { data: user, error } = await supabase
@@ -84,45 +170,11 @@ async function handleDailyGet(req, res, params, url) {
     }
 
     console.log(`[Daily] Generating insight for user ${user.id} (${user.sun_sign})`);
-    const transitData = calculateDailyTransits(user.natal_planets);
 
-    const PLANET_TR = {
-      Sun:'Güneş', Moon:'Ay', Mercury:'Merkür', Venus:'Venüs', Mars:'Mars',
-      Jupiter:'Jüpiter', Saturn:'Satürn', Uranus:'Uranüs', Neptune:'Neptün', Pluto:'Plüton',
-      TrueNode:'Kuzey Düğüm', Chiron:'Chiron', Lilith:'Lilith',
-    };
-
-    const natalLines = [];
-
-    // Ascendant / MC from stored natal data
-    const natalAsc = user.natal_planets?._ascendant;
-    const natalMC = user.natal_planets?._mc;
-    if (natalAsc) natalLines.push(`Yükselen ${toTR(natalAsc.sign)} burcunda ${natalAsc.degree}°`);
-    if (natalMC) natalLines.push(`MC ${toTR(natalMC.sign)} burcunda ${natalMC.degree}°`);
-
-    // Planet positions with house placements
-    for (const [planet, data] of Object.entries(user.natal_planets)) {
-      if (planet.startsWith('_')) continue; // skip metadata keys
-      if (!data || !data.sign) continue;
-      const rx = data.isRetrograde ? ' (Rx)' : '';
-      const house = data.house ? ` [Ev ${data.house}]` : '';
-      const planetTR = PLANET_TR[planet] || planet;
-      natalLines.push(`${planetTR} ${toTR(data.sign)} burcunda ${data.degree}°${rx}${house}`);
-    }
-
-    // Part of Fortune
-    const pof = user.natal_planets?._partOfFortune;
-    if (pof) natalLines.push(`Pars Fortuna ${toTR(pof.sign)} burcunda ${pof.degree}°`);
-
-    // Top natal aspects
-    const natalAspects = user.natal_planets?._natalAspects;
-    if (natalAspects && natalAspects.length > 0) {
-      natalLines.push('\nNatal Açılar:');
-      const top5 = natalAspects.slice(0, 5);
-      for (const a of top5) {
-        natalLines.push(`${a.planet1} ${a.symbol} ${a.planet2} (${a.aspect}, orb ${a.orb}°, ${a.nature})`);
-      }
-    }
+    // Always recalculate natal chart fresh (timezone-aware) — fixes stale DB data
+    const { natalPlanets, ascSign } = getFreshNatalData(user);
+    const transitData = calculateDailyTransits(natalPlanets);
+    const natalLines  = buildNatalLines(natalPlanets);
 
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
     const { data: yesterdayInsight } = await supabase
@@ -135,16 +187,16 @@ async function handleDailyGet(req, res, params, url) {
     let insight;
     try {
       insight = await generateDailyInsight({
-        natalSummary: natalLines.join('\n'),
-        transitSummary: transitData.summary,
-        gender: user.gender,
+        natalSummary:       natalLines.join('\n'),
+        transitSummary:     transitData.summary,
+        gender:             user.gender,
         relationshipStatus: user.relationship_status,
-        workStatus: user.work_status,
-        sunSign: toTR(user.sun_sign),
-        moonSign: toTR(user.moon_sign),
-        ascendantSign: natalAsc?.sign || null,
-        preferredName: url.searchParams.get('preferredName') || '',
-        yesterdayFocus: yesterdayInsight?.daily_focus?.short || null,
+        workStatus:         user.work_status,
+        sunSign:            toTR(user.sun_sign),
+        moonSign:           toTR(user.moon_sign),
+        ascendantSign:      ascSign,
+        preferredName:      url.searchParams.get('preferredName') || '',
+        yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
       });
     } catch (aiError) {
       console.error(`[Daily] AI generation failed, using fallback. Error: ${aiError.message}\nStack: ${aiError.stack}`);
@@ -234,39 +286,10 @@ async function handleDailyGenerateAll(req, res, _params, url) {
           return 'skipped';
         }
 
-        const transitData = calculateDailyTransits(user.natal_planets);
-
-        const BATCH_PLANET_TR = {
-          Sun:'Güneş', Moon:'Ay', Mercury:'Merkür', Venus:'Venüs', Mars:'Mars',
-          Jupiter:'Jüpiter', Saturn:'Satürn', Uranus:'Uranüs', Neptune:'Neptün', Pluto:'Plüton',
-          TrueNode:'Kuzey Düğüm', Chiron:'Chiron', Lilith:'Lilith',
-        };
-
-        const natalLines = [];
-        const batchAsc = user.natal_planets?._ascendant;
-        const batchMC = user.natal_planets?._mc;
-        if (batchAsc) natalLines.push(`Yükselen ${toTR(batchAsc.sign)} burcunda ${batchAsc.degree}°`);
-        if (batchMC) natalLines.push(`MC ${toTR(batchMC.sign)} burcunda ${batchMC.degree}°`);
-
-        for (const [planet, data] of Object.entries(user.natal_planets)) {
-          if (planet.startsWith('_')) continue;
-          if (!data || !data.sign) continue;
-          const rx = data.isRetrograde ? ' (Rx)' : '';
-          const house = data.house ? ` [Ev ${data.house}]` : '';
-          const planetTR = BATCH_PLANET_TR[planet] || planet;
-          natalLines.push(`${planetTR} ${toTR(data.sign)} burcunda ${data.degree}°${rx}${house}`);
-        }
-
-        const batchPof = user.natal_planets?._partOfFortune;
-        if (batchPof) natalLines.push(`Pars Fortuna ${toTR(batchPof.sign)} burcunda ${batchPof.degree}°`);
-
-        const batchNatalAspects = user.natal_planets?._natalAspects;
-        if (batchNatalAspects && batchNatalAspects.length > 0) {
-          natalLines.push('\nNatal Açılar:');
-          for (const a of batchNatalAspects.slice(0, 5)) {
-            natalLines.push(`${a.planet1} ${a.symbol} ${a.planet2} (${a.aspect}, orb ${a.orb}°, ${a.nature})`);
-          }
-        }
+        // Always recalculate natal chart fresh (timezone-aware)
+        const { natalPlanets: batchNatalPlanets, ascSign: batchAscSign } = getFreshNatalData(user);
+        const transitData = calculateDailyTransits(batchNatalPlanets);
+        const natalLines  = buildNatalLines(batchNatalPlanets);
 
         const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
         const { data: yesterdayInsight } = await supabase
@@ -277,16 +300,16 @@ async function handleDailyGenerateAll(req, res, _params, url) {
           .single();
 
         const insight = await generateDailyInsight({
-          natalSummary: natalLines.join('\n'),
-          transitSummary: transitData.summary,
-          gender: user.gender,
+          natalSummary:       natalLines.join('\n'),
+          transitSummary:     transitData.summary,
+          gender:             user.gender,
           relationshipStatus: user.relationship_status,
-          workStatus: user.work_status,
-          sunSign: toTR(user.sun_sign),
-          moonSign: toTR(user.moon_sign),
-          ascendantSign: batchAsc?.sign || null,
-          preferredName: user.preferred_name || '',
-          yesterdayFocus: yesterdayInsight?.daily_focus?.short || null,
+          workStatus:         user.work_status,
+          sunSign:            toTR(user.sun_sign),
+          moonSign:           toTR(user.moon_sign),
+          ascendantSign:      batchAscSign,
+          preferredName:      user.preferred_name || '',
+          yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
         });
 
         await supabase.from('daily_insights').insert({
@@ -336,36 +359,10 @@ async function generateInsightForUser(user, today) {
 
   if (existing) return 'skipped';
 
-  const PLANET_TR = {
-    Sun:'Güneş', Moon:'Ay', Mercury:'Merkür', Venus:'Venüs', Mars:'Mars',
-    Jupiter:'Jüpiter', Saturn:'Satürn', Uranus:'Uranüs', Neptune:'Neptün', Pluto:'Plüton',
-    TrueNode:'Kuzey Düğüm', Chiron:'Chiron', Lilith:'Lilith',
-  };
-
-  const transitData = calculateDailyTransits(user.natal_planets);
-  const natalLines = [];
-  const natalAsc = user.natal_planets?._ascendant;
-  const natalMC  = user.natal_planets?._mc;
-  if (natalAsc) natalLines.push(`Yükselen ${toTR(natalAsc.sign)} burcunda ${natalAsc.degree}°`);
-  if (natalMC)  natalLines.push(`MC ${toTR(natalMC.sign)} burcunda ${natalMC.degree}°`);
-
-  for (const [planet, data] of Object.entries(user.natal_planets)) {
-    if (planet.startsWith('_') || !data?.sign) continue;
-    const rx    = data.isRetrograde ? ' (Rx)' : '';
-    const house = data.house ? ` [Ev ${data.house}]` : '';
-    natalLines.push(`${PLANET_TR[planet] || planet} ${toTR(data.sign)} burcunda ${data.degree}°${rx}${house}`);
-  }
-
-  const pof = user.natal_planets?._partOfFortune;
-  if (pof) natalLines.push(`Pars Fortuna ${toTR(pof.sign)} burcunda ${pof.degree}°`);
-
-  const natalAspects = user.natal_planets?._natalAspects;
-  if (natalAspects?.length) {
-    natalLines.push('\nNatal Açılar:');
-    for (const a of natalAspects.slice(0, 5)) {
-      natalLines.push(`${a.planet1} ${a.symbol} ${a.planet2} (${a.aspect}, orb ${a.orb}°, ${a.nature})`);
-    }
-  }
+  // Always recalculate natal chart fresh (timezone-aware) — fixes stale DB data
+  const { natalPlanets: freshNatalPlanets, ascSign: freshAscSign } = getFreshNatalData(user);
+  const transitData = calculateDailyTransits(freshNatalPlanets);
+  const natalLines  = buildNatalLines(freshNatalPlanets);
 
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
   const { data: yesterdayInsight } = await supabase
@@ -383,7 +380,7 @@ async function generateInsightForUser(user, today) {
     workStatus:         user.work_status,
     sunSign:            toTR(user.sun_sign),
     moonSign:           toTR(user.moon_sign),
-    ascendantSign:      natalAsc?.sign || null,
+    ascendantSign:      freshAscSign,
     preferredName:      user.preferred_name || '',
     yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
   });

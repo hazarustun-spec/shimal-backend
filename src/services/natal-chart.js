@@ -99,7 +99,8 @@ function buildNatalChart(birthDate, birthTime, latitude = null, longitude = null
     date = localTimeToUTC(year, month, day, hour, minute, latitude, longitude);
   } else {
     // No location: treat as UTC (legacy behavior)
-    date = new Date(Date.UTC(year, month, day, hour, minute, 0));
+    // Note: Date.UTC month is 0-based, so subtract 1
+    date = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
   }
 
   // Calculate natal chart with optional house system
