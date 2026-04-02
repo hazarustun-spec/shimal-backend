@@ -285,6 +285,88 @@ async function handleMigrateNatalCharts(req, res) {
   }
 }
 
+async function handleUpdateProfile(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    const {
+      deviceId, birthDate, birthTime, birthPlace,
+      birthLatitude, birthLongitude,
+      gender, relationshipStatus, workStatus, preferredName,
+    } = body;
+
+    if (!deviceId || !isValidDeviceId(deviceId)) return badRequest(res, 'Geçersiz cihaz kimliği');
+    if (!checkOwnership(req, res, deviceId)) return;
+
+    // Validate optional birth fields if provided
+    if (birthDate && !isValidBirthDate(birthDate)) return badRequest(res, 'Geçersiz doğum tarihi');
+    if (birthTime && !isValidBirthTime(birthTime)) return badRequest(res, 'Geçersiz doğum saati');
+
+    // Fetch current user
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('id, birth_date, birth_time, birth_latitude, birth_longitude, relationship_status, work_status')
+      .eq('device_id', deviceId)
+      .maybeSingle();
+
+    if (fetchError || !user) return writeJson(res, 404, { error: 'Kullanıcı bulunamadı' });
+
+    const updateData = { updated_at: new Date().toISOString() };
+    let birthDataChanged = false;
+    let contextDataChanged = false;
+
+    // Birth fields
+    const newBirthDate = birthDate || user.birth_date;
+    const newBirthTime = birthTime || user.birth_time;
+    const newLat = birthLatitude !== undefined ? birthLatitude : user.birth_latitude;
+    const newLon = birthLongitude !== undefined ? birthLongitude : user.birth_longitude;
+
+    if (birthDate && birthDate !== user.birth_date) { updateData.birth_date = birthDate; birthDataChanged = true; }
+    if (birthTime && birthTime !== user.birth_time) { updateData.birth_time = birthTime; birthDataChanged = true; }
+    if (birthLatitude !== undefined && birthLatitude !== user.birth_latitude) { updateData.birth_latitude = birthLatitude; birthDataChanged = true; }
+    if (birthLongitude !== undefined && birthLongitude !== user.birth_longitude) { updateData.birth_longitude = birthLongitude; birthDataChanged = true; }
+    if (birthPlace !== undefined) updateData.birth_place = birthPlace;
+
+    // Context fields
+    if (relationshipStatus && relationshipStatus !== user.relationship_status) { updateData.relationship_status = relationshipStatus; contextDataChanged = true; }
+    if (workStatus && workStatus !== user.work_status) { updateData.work_status = workStatus; contextDataChanged = true; }
+    if (gender) updateData.gender = gender;
+    if (preferredName !== undefined) updateData.preferred_name = preferredName;
+
+    // Recalculate natal chart if birth data changed
+    let natalResult = {};
+    if (birthDataChanged) {
+      const natalChart = buildNatalChart(newBirthDate, newBirthTime, newLat, newLon);
+      updateData.sun_sign = natalChart.sunSign;
+      updateData.moon_sign = natalChart.moonSign;
+      updateData.ascendant_sign = natalChart.ascendantSign || null;
+      updateData.natal_planets = {
+        ...natalChart.planets,
+        _ascendant: natalChart.ascendant || null,
+        _mc: natalChart.mc || null,
+      };
+      natalResult = {
+        sunSign: toTR(natalChart.sunSign),
+        moonSign: toTR(natalChart.moonSign),
+        ascendantSign: natalChart.ascendantSign ? toTR(natalChart.ascendantSign) : null,
+      };
+    }
+
+    const { error: updateError } = await supabase.from('users').update(updateData).eq('device_id', deviceId);
+    if (updateError) throw updateError;
+
+    // Delete today's insight so it regenerates with new context
+    if (birthDataChanged || contextDataChanged) {
+      const today = new Date().toISOString().split('T')[0];
+      await supabase.from('daily_insights').delete().eq('user_id', user.id).eq('date', today);
+      console.log(`[User] Profile updated, deleted today's insight for ${deviceId}`);
+    }
+
+    writeJson(res, 200, { success: true, birthDataChanged, contextDataChanged, ...natalResult });
+  } catch (error) {
+    internalError(res, error, '[User] Update profile error:', 'Profil güncellenemedi');
+  }
+}
+
 async function handleUserRefreshTime(req, res) {
   try {
     const body = await readJsonBody(req);
@@ -321,6 +403,7 @@ async function handleUserRefreshTime(req, res) {
 module.exports = [
   ['POST', /^\/api\/user\/register$/, handleUserRegister],
   ['PUT', /^\/api\/user\/push-token$/, handleUserPushToken],
+  ['PUT', /^\/api\/user\/profile$/, handleUpdateProfile],
   ['PUT', /^\/api\/user\/refresh-time$/, handleUserRefreshTime],
   ['POST', /^\/api\/user\/delete$/, handleUserDeletePost],
   ['POST', /^\/api\/user\/migrate-natal$/, handleMigrateNatalCharts],
