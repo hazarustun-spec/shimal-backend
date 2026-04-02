@@ -75,36 +75,75 @@ async function handleMoonPhase(_req, res) {
 
 async function handleNatalChart(req, res, _params, url) {
   try {
-    // Prefer DB-stored birth data (guaranteed consistent with daily/Siz pages).
-    // Fall back to query params only when deviceId header is absent.
     const deviceId = req.headers['x-device-id'];
-    let birthDate, birthTime, lat, lon;
 
+    // ── Primary path: serve stored natal_planets from DB ──────────────────
+    // This guarantees the NatalChart page shows the exact same ascendant/planets
+    // as Siz and Bugün pages, which also read from stored natal_planets.
     if (deviceId) {
       const { data: user } = await supabase
         .from('users')
-        .select('birth_date, birth_time, birth_latitude, birth_longitude')
+        .select('natal_planets, sun_sign, moon_sign, ascendant_sign')
         .eq('device_id', deviceId)
         .maybeSingle();
 
-      if (user) {
-        birthDate = user.birth_date;
-        birthTime = user.birth_time || '12:00';
-        lat  = user.birth_latitude  ?? null;
-        lon  = user.birth_longitude ?? null;
-        console.log(`[NatalChart] Using DB data for ${deviceId}: ${birthDate} ${birthTime} (${lat},${lon})`);
+      if (user && user.natal_planets && Object.keys(user.natal_planets).length > 0) {
+        const np = user.natal_planets;
+
+        // Build planets map from stored data (exclude private _ keys)
+        const planets = {};
+        for (const [name, data] of Object.entries(np)) {
+          if (name.startsWith('_') || !data || typeof data !== 'object') continue;
+          planets[name] = {
+            sign: data.sign,
+            degree: data.degree,
+            longitude: data.longitude,
+            symbol: data.symbol,
+            element: data.element,
+            isRetrograde: data.isRetrograde,
+            house: data.house || null,
+          };
+        }
+
+        const response = {
+          sunSign:  toTR(user.sun_sign  || np.Sun?.sign),
+          moonSign: toTR(user.moon_sign || np.Moon?.sign),
+          planets,
+        };
+
+        if (np._ascendant) {
+          response.ascendant = {
+            sign:      np._ascendant.sign,
+            degree:    np._ascendant.degree,
+            longitude: np._ascendant.longitude,
+          };
+        }
+        if (np._mc) {
+          response.mc = {
+            sign:      np._mc.sign,
+            degree:    np._mc.degree,
+            longitude: np._mc.longitude,
+          };
+        }
+        if (np._houses) {
+          response.houses = np._houses;
+        }
+        if (user.ascendant_sign || np._ascendant?.sign) {
+          response.ascendantSign = toTR(user.ascendant_sign || np._ascendant.sign);
+        }
+
+        console.log(`[NatalChart] Serving stored natal_planets for ${deviceId} — asc: ${response.ascendantSign}`);
+        return writeJson(res, 200, response);
       }
     }
 
-    // Fallback to query params if no user found
-    if (!birthDate) {
-      birthDate = url.searchParams.get('birthDate');
-      birthTime = url.searchParams.get('birthTime') || '12:00';
-      const rawLat = url.searchParams.get('lat');
-      const rawLon = url.searchParams.get('lon');
-      lat = rawLat != null ? (parseFloat(rawLat) || null) : null;
-      lon = rawLon != null ? (parseFloat(rawLon) || null) : null;
-    }
+    // ── Fallback: calculate fresh (no deviceId or no stored data) ──────────
+    let birthDate = url.searchParams.get('birthDate');
+    let birthTime = url.searchParams.get('birthTime') || '12:00';
+    const rawLat  = url.searchParams.get('lat');
+    const rawLon  = url.searchParams.get('lon');
+    const lat = rawLat != null ? (parseFloat(rawLat) || null) : null;
+    const lon = rawLon != null ? (parseFloat(rawLon) || null) : null;
 
     if (!birthDate || !isValidBirthDate(birthDate)) {
       return badRequest(res, 'Valid birthDate is required (YYYY-MM-DD)');
@@ -113,7 +152,6 @@ async function handleNatalChart(req, res, _params, url) {
       return badRequest(res, 'Geçersiz doğum saati (SS:DD)');
     }
 
-    // buildNatalChart koordinatlardan timezone çevrimini doğru yapar (Siz/Bugün ile aynı mantık)
     const chart = buildNatalChart(birthDate, birthTime, lat, lon);
     const planets = {};
     for (const [name, data] of Object.entries(chart.planets)) {
@@ -134,27 +172,14 @@ async function handleNatalChart(req, res, _params, url) {
       planets,
     };
 
-    // Add house system data if available (requires lat/lon)
     if (chart.ascendant) {
-      response.ascendant = {
-        sign: chart.ascendant.sign,
-        degree: chart.ascendant.degree,
-        longitude: chart.ascendant.longitude,
-      };
+      response.ascendant = { sign: chart.ascendant.sign, degree: chart.ascendant.degree, longitude: chart.ascendant.longitude };
     }
     if (chart.mc) {
-      response.mc = {
-        sign: chart.mc.sign,
-        degree: chart.mc.degree,
-        longitude: chart.mc.longitude,
-      };
+      response.mc = { sign: chart.mc.sign, degree: chart.mc.degree, longitude: chart.mc.longitude };
     }
-    if (chart.houses) {
-      response.houses = chart.houses;
-    }
-    if (chart.ascendantSign) {
-      response.ascendantSign = toTR(chart.ascendantSign);
-    }
+    if (chart.houses)       response.houses = chart.houses;
+    if (chart.ascendantSign) response.ascendantSign = toTR(chart.ascendantSign);
 
     writeJson(res, 200, response);
   } catch (error) {

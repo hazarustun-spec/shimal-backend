@@ -38,18 +38,6 @@ function getFreshNatalData(user) {
       _natalAspects: natalChart.natalAspects || null,
     };
 
-    // Background DB update — fixes stale stored natal_planets without blocking the request
-    supabase.from('users')
-      .update({
-        natal_planets:  natalPlanets,
-        sun_sign:       natalChart.sunSign,
-        moon_sign:      natalChart.moonSign,
-        ascendant_sign: natalChart.ascendantSign || null,
-      })
-      .eq('id', user.id)
-      .then(() => {})
-      .catch((e) => console.warn(`[Daily] Background natal update failed for user ${user.id}:`, e.message));
-
     return { natalPlanets, ascSign: natalChart.ascendantSign || null };
   } catch (err) {
     console.warn(`[Daily] Fresh natal chart failed for user ${user.id}, using stored data:`, err.message);
