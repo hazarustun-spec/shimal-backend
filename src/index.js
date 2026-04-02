@@ -123,7 +123,16 @@ async function routeRequest(req, res) {
   setSecurityHeaders(res);
 
   if (req.method === 'OPTIONS') {
-    res.writeHead(204);
+    const url = getRequestUrl(req);
+    if (url.pathname.startsWith('/dashboard/')) {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'x-api-key, x-dashboard-key, content-type',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      });
+    } else {
+      res.writeHead(204);
+    }
     res.end();
     return;
   }
