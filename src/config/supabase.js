@@ -78,6 +78,15 @@ class SupabaseQueryBuilder {
     return this.execute();
   }
 
+  async maybeSingle() {
+    // Like single() but returns null data (not error) when no rows found
+    this.limitValue = 1;
+    const result = await this.execute();
+    if (result.error) return result;
+    const rows = Array.isArray(result.data) ? result.data : [];
+    return { data: rows[0] ?? null, error: null };
+  }
+
   then(resolve, reject) {
     return this.execute().then(resolve, reject);
   }
