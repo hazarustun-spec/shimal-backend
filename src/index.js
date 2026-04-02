@@ -37,6 +37,7 @@ const geomagneticRoutes = require('./routes/geomagnetic');
 const personalityRoutes = require('./routes/personality');
 const feedbackRoutes = require('./routes/feedback');
 const demoRoutes = require('./routes/demo');
+const dashboardRoutes = require('./routes/dashboard');
 
 const PORT = Number(process.env.PORT || 3000);
 
@@ -113,6 +114,7 @@ const routes = [
   ...personalityRoutes,
   ...feedbackRoutes,
   ...demoRoutes,
+  ...dashboardRoutes,
 ];
 
 // ─── Request dispatcher ───────────────────────────────────────────────────────
@@ -135,8 +137,9 @@ async function routeRequest(req, res) {
   // API key check (skip public routes and cron endpoint which has its own auth)
   const isPublic = url.pathname === '/' || url.pathname === '/health';
   const isCron = url.pathname === '/api/daily/generate-all' || url.pathname === '/api/user/migrate-natal';
+  const isDashboard = url.pathname.startsWith('/dashboard/');
   const isDemo = url.pathname.startsWith('/api/demo/');
-  if (!isPublic && !isCron && !isDemo) {
+  if (!isPublic && !isCron && !isDemo && !isDashboard) {
     if (!checkApiKey(req, res)) return;
   }
 
