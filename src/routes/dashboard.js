@@ -111,22 +111,19 @@ async function getSupabaseStats() {
       count(`daily_insights?select=id&date=gte.${monthStart}`),
     ]);
 
-    // Sun sign + refresh hour dağılımı ve aktif kullanıcılar tek sorguda
-    const [usersRes, active7Res, active30Res] = await Promise.all([
-      fetch(`${SURL}/rest/v1/users?select=sun_sign,refresh_hour`, {
-        headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
-      }),
-      fetch(`${SURL}/rest/v1/daily_insights?select=user_id&date=gte.${day7Ago}`, {
-        headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
-      }),
-      fetch(`${SURL}/rest/v1/daily_insights?select=user_id&date=gte.${day30Ago}`, {
-        headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
-      }),
+    // Sun sign + refresh hour dağılımı, aktif kullanıcılar, yeni kullanıcı IDs paralel
+    const hJson = { apikey: KEY, Authorization: `Bearer ${KEY}` };
+    const [usersRes, active7Res, active30Res, newUsersRes] = await Promise.all([
+      fetch(`${SURL}/rest/v1/users?select=sun_sign,refresh_hour`, { headers: hJson }),
+      fetch(`${SURL}/rest/v1/daily_insights?select=user_id&date=gte.${day7Ago}`, { headers: hJson }),
+      fetch(`${SURL}/rest/v1/daily_insights?select=user_id&date=gte.${day30Ago}`, { headers: hJson }),
+      fetch(`${SURL}/rest/v1/users?select=id&created_at=gte.${weekAgo}`, { headers: hJson }),
     ]);
 
-    const allUsers   = await usersRes.json();
+    const allUsers    = await usersRes.json();
     const active7Raw  = await active7Res.json();
     const active30Raw = await active30Res.json();
+    const newUsersRaw = await newUsersRes.json();
 
     const signDist = {};
     const refreshHourDist = {};
@@ -139,11 +136,25 @@ async function getSupabaseStats() {
       }
     }
 
-    const activeUsers7d  = Array.isArray(active7Raw)  ? new Set(active7Raw.map(r => r.user_id)).size  : 0;
-    const activeUsers30d = Array.isArray(active30Raw) ? new Set(active30Raw.map(r => r.user_id)).size : 0;
+    const active7Set   = new Set(Array.isArray(active7Raw)  ? active7Raw.map(r => r.user_id)  : []);
+    const active30Set  = new Set(Array.isArray(active30Raw) ? active30Raw.map(r => r.user_id) : []);
+    const newUserIdSet = new Set(Array.isArray(newUsersRaw) ? newUsersRaw.map(r => r.id)      : []);
+
+    const activeUsers7d  = active7Set.size;
+    const activeUsers30d = active30Set.size;
+    // Yeni kullanıcılardan kaçı ilk 7 gün içinde insight aldı
+    const newUsersActivated = [...newUserIdSet].filter(id => active7Set.has(id)).length;
+    // Hiç aktif olmayan kullanıcılar (churn riski)
+    const churnRisk = Math.max(0, totalUsers - activeUsers30d);
+    // Insight başarı oranı: bu ayki insight / beklenen (push token × geçen gün sayısı)
+    const daysInMonth = now.getDate();
+    const expectedInsights = usersWithPush * daysInMonth;
+    const insightSuccessRate = expectedInsights > 0
+      ? Math.min(100, Math.round(insightsThisMonth / expectedInsights * 100)) : null;
 
     return { ok: true, totalUsers, usersWithPush, premiumUsers, newToday, newWeek,
              insightsToday, insightsThisMonth, activeUsers7d, activeUsers30d,
+             newUsersActivated, churnRisk, insightSuccessRate,
              signDist, refreshHourDist };
   } catch (err) {
     logError('supabase', err.message);

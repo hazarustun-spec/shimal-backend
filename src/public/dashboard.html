@@ -7,72 +7,93 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0d0f14;--card:#161921;--card2:#1c2030;--border:#252a35;
-  --text:#e8eaf0;--muted:#7a8099;--muted2:#4a5068;
-  --accent:#c9a84c;--green:#4caf7d;--red:#e05c5c;--blue:#5b8dee;--purple:#9b7fe8;
+  --bg:#0d0f14;--card:#161921;--card2:#1c2030;--border:#252a35;--border2:#1e2330;
+  --text:#e8eaf0;--muted:#7a8099;--muted2:#3d4460;
+  --accent:#c9a84c;--green:#4caf7d;--red:#e05c5c;--blue:#5b8dee;--purple:#9b7fe8;--orange:#e8924a;
   --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 }
 body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
 
 /* ── Login ── */
-#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh}
-.login-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px;width:340px;text-align:center}
-.login-box h1{font-size:28px;color:var(--accent);margin-bottom:6px}
-.login-box p{color:var(--muted);font-size:14px;margin-bottom:28px}
-.login-box input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-size:15px;outline:none;margin-bottom:12px}
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 50% 0%,#1a1025 0%,var(--bg) 60%)}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:44px 40px;width:350px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.login-logo{font-size:42px;margin-bottom:12px}
+.login-box h1{font-size:24px;color:var(--accent);margin-bottom:4px;font-weight:700;letter-spacing:.3px}
+.login-box p{color:var(--muted);font-size:13px;margin-bottom:28px}
+.login-box input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px 16px;color:var(--text);font-size:15px;outline:none;margin-bottom:12px;transition:border-color .2s}
 .login-box input:focus{border-color:var(--accent)}
-.login-box button{width:100%;background:var(--accent);color:#0d0f14;font-weight:700;font-size:15px;padding:12px;border:none;border-radius:8px;cursor:pointer}
-.login-box button:hover{opacity:.9}
+.login-box button{width:100%;background:var(--accent);color:#0d0f14;font-weight:700;font-size:15px;padding:13px;border:none;border-radius:10px;cursor:pointer;letter-spacing:.3px;transition:opacity .15s}
+.login-box button:hover{opacity:.88}
 #login-error{color:var(--red);font-size:13px;margin-top:10px;min-height:18px}
 
 /* ── App shell ── */
 #app{display:none}
-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:10;height:56px}
-.header-left{display:flex;align-items:center;gap:20px}
-header h1{font-size:18px;color:var(--accent);letter-spacing:.5px;white-space:nowrap}
-.header-right{display:flex;align-items:center;gap:12px}
-.refresh-btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 13px;border-radius:8px;cursor:pointer;font-size:13px}
-.refresh-btn:hover{border-color:var(--accent)}
-.last-update{color:var(--muted);font-size:12px}
-.logout-btn{color:var(--muted);font-size:13px;cursor:pointer;background:none;border:none}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(13,15,20,.95);backdrop-filter:blur(8px);z-index:10;height:54px}
+.header-left{display:flex;align-items:center;gap:18px}
+.brand{font-size:17px;color:var(--accent);font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.header-right{display:flex;align-items:center;gap:10px}
+.refresh-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:13px;transition:all .15s}
+.refresh-btn:hover{border-color:var(--accent);color:var(--text)}
+.last-update{color:var(--muted2);font-size:11px}
+.logout-btn{color:var(--muted2);font-size:12px;cursor:pointer;background:none;border:none;transition:color .15s}
 .logout-btn:hover{color:var(--red)}
 
-/* ── Tab navigation ── */
-.tabs{display:flex;gap:2px}
-.tab{padding:6px 16px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border:none;background:none;transition:all .15s}
+/* ── Tabs ── */
+.tabs{display:flex;gap:1px;background:var(--border2);border-radius:9px;padding:2px}
+.tab{padding:5px 14px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border:none;background:none;transition:all .15s;white-space:nowrap}
 .tab:hover{color:var(--text)}
-.tab.active{background:var(--card);color:var(--accent);border:1px solid var(--border)}
+.tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.4)}
 
 /* ── Tab panels ── */
 .tab-panel{display:none}
 .tab-panel.active{display:block}
-
 main{padding:20px 24px;max-width:1400px;margin:0 auto}
 
 /* ── Stat cards ── */
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
-.card-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:15px 17px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:transparent}
+.card.c-accent::before{background:var(--accent)}
+.card.c-green::before{background:var(--green)}
+.card.c-blue::before{background:var(--blue)}
+.card.c-red::before{background:var(--red)}
+.card.c-purple::before{background:var(--purple)}
+.card.c-orange::before{background:var(--orange)}
+.card-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.7px;margin-bottom:7px}
 .card-value{font-size:26px;font-weight:700;line-height:1}
-.card-sub{color:var(--muted);font-size:12px;margin-top:5px}
-.card-delta{font-size:11px;margin-top:4px}
-.card-delta.up{color:var(--green)}
-.card-delta.dn{color:var(--red)}
 .c-accent .card-value{color:var(--accent)}
 .c-green  .card-value{color:var(--green)}
 .c-blue   .card-value{color:var(--blue)}
 .c-red    .card-value{color:var(--red)}
 .c-purple .card-value{color:var(--purple)}
+.c-orange .card-value{color:var(--orange)}
+.card-sub{color:var(--muted);font-size:12px;margin-top:5px}
+.card-delta{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;margin-top:5px;padding:2px 6px;border-radius:4px}
+.card-delta.up{color:var(--green);background:rgba(76,175,125,.1)}
+.card-delta.dn{color:var(--red);background:rgba(224,92,92,.1)}
+.card-delta.nt{color:var(--muted);background:rgba(122,128,153,.08)}
+
+/* ── Tracking cards row ── */
+.tracking-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:500px){.tracking-row{grid-template-columns:1fr}}
+.track-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px}
+.track-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.track-icon.orange{background:rgba(232,146,74,.12)}
+.track-icon.green{background:rgba(76,175,125,.12)}
+.track-icon.purple{background:rgba(155,127,232,.12)}
+.track-body{}
+.track-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.track-val{font-size:20px;font-weight:700}
+.track-sub{font-size:11px;color:var(--muted);margin-top:2px}
 
 /* ── Grid ── */
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
-@media(max-width:1100px){.grid3{grid-template-columns:1fr 1fr}}
-@media(max-width:800px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
-.section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:14px}
-.section h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:8px}
-.section h2 .ico{font-size:15px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:900px){.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.grid2,.grid3{grid-template-columns:1fr}}
+.section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:12px}
+.section h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:15px;display:flex;align-items:center;gap:7px}
+.section h2 .ico{font-size:15px;opacity:.9}
 
 /* ── Metric rows ── */
 .metric-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
@@ -82,72 +103,79 @@ main{padding:20px 24px;max-width:1400px;margin:0 auto}
 .ok{color:var(--green)}.warn{color:var(--accent)}.err{color:var(--red)}
 
 /* ── Funnel ── */
-.funnel{display:flex;flex-direction:column;gap:10px}
-.funnel-step{display:flex;align-items:center;gap:12px}
-.funnel-label{width:140px;font-size:13px;color:var(--muted);text-align:right;flex-shrink:0}
-.funnel-track{flex:1;background:var(--bg);border-radius:6px;height:28px;position:relative;overflow:hidden}
-.funnel-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:700;color:#0d0f14;white-space:nowrap;transition:width .6s ease}
-.funnel-meta{width:90px;text-align:right;flex-shrink:0}
-.funnel-count{font-size:15px;font-weight:700}
-.funnel-pct{font-size:11px;color:var(--muted);margin-left:4px}
-.funnel-arrow{text-align:center;color:var(--muted2);font-size:11px;padding-left:152px}
+.funnel{display:flex;flex-direction:column;gap:8px}
+.funnel-step{display:flex;align-items:center;gap:10px}
+.funnel-label{width:110px;font-size:12px;color:var(--muted);text-align:right;flex-shrink:0}
+.funnel-track{flex:1;background:var(--bg);border-radius:6px;height:26px;position:relative;overflow:hidden}
+.funnel-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:700;color:rgba(13,15,20,.85);white-space:nowrap;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.funnel-meta{width:86px;text-align:right;flex-shrink:0}
+.funnel-count{font-size:14px;font-weight:700}
+.funnel-pct{font-size:11px;color:var(--muted);margin-left:3px}
+.funnel-drop{text-align:center;color:var(--muted2);font-size:10px;padding-left:120px;margin:-2px 0}
+
+/* ── Engagement grid ── */
+.eng-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.eng-item{display:flex;flex-direction:column;align-items:center;padding:12px 8px;background:var(--bg);border-radius:10px;border:1px solid var(--border)}
+.eng-ring{position:relative;width:72px;height:72px;flex-shrink:0}
+.eng-ring svg{transform:rotate(-90deg)}
+.eng-ring-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:15px;font-weight:700;line-height:1.1}
+.eng-ring-label small{font-size:9px;color:var(--muted);font-weight:400}
+.eng-title{font-size:12px;font-weight:600;margin-top:8px;text-align:center}
+.eng-sub{font-size:11px;color:var(--muted);text-align:center;margin-top:3px}
 
 /* ── Canvas charts ── */
-canvas{display:block;width:100%!important;margin-top:10px}
+.chart-wrap{position:relative}
+canvas{display:block;width:100%!important}
+.chart-tooltip{position:absolute;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;pointer-events:none;white-space:nowrap;display:none;z-index:5}
+.chart-tooltip strong{display:block;color:var(--accent);margin-bottom:1px}
 
 /* ── Sign distribution ── */
-.sign-bar{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px}
-.sign-name{width:76px;color:var(--muted);text-align:right;flex-shrink:0}
-.sign-track{flex:1;background:var(--bg);border-radius:4px;height:15px;overflow:hidden}
-.sign-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .4s}
-.sign-count{width:28px;flex-shrink:0;color:var(--text);font-weight:600;text-align:right}
+.sign-bar{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:12px}
+.sign-name{width:72px;color:var(--muted);text-align:right;flex-shrink:0}
+.sign-track{flex:1;background:var(--bg);border-radius:3px;height:14px;overflow:hidden}
+.sign-fill{height:100%;background:linear-gradient(90deg,var(--accent),#e8b84c);border-radius:3px;transition:width .4s}
+.sign-count{width:26px;flex-shrink:0;color:var(--text);font-weight:600;text-align:right;font-size:11px}
 
 /* ── Error log ── */
-.error-list{max-height:200px;overflow-y:auto}
-.error-item{padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+.error-list{max-height:180px;overflow-y:auto}
+.error-item{padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;display:flex;gap:6px;align-items:baseline}
 .error-item:last-child{border-bottom:none}
-.error-ts{color:var(--muted);margin-right:6px}
-.error-src{color:var(--accent);margin-right:5px}
+.error-ts{color:var(--muted2);flex-shrink:0}
+.error-src{color:var(--accent);flex-shrink:0}
 .error-msg{color:var(--red)}
-.empty{color:var(--muted);font-size:13px;text-align:center;padding:20px}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:18px}
 
 /* ── Status dot ── */
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
-.dot.ok{background:var(--green)}.dot.err{background:var(--red)}.dot.warn{background:var(--accent)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;flex-shrink:0}
+.dot.ok{background:var(--green);box-shadow:0 0 5px rgba(76,175,125,.5)}
+.dot.err{background:var(--red)}
+.dot.warn{background:var(--accent)}
 
-/* ── Loading/spinner ── */
-.loading{color:var(--muted);font-size:13px;text-align:center;padding:40px}
-.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
+/* ── Cost cards ── */
+.cost-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+.cost-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;text-align:center}
+.cost-card .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px}
+.cost-card .val{font-size:22px;font-weight:700}
+.cost-card .sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* ── Hour chart ── */
+.hour-chart{display:flex;align-items:flex-end;gap:2px;height:52px;margin-top:10px}
+.hour-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.hour-bar{width:100%;background:#c9a84c;border-radius:2px 2px 0 0;transition:height .4s;min-height:2px}
+.hour-lbl{font-size:8px;color:var(--muted2)}
+
+/* ── Loading ── */
+.loading{color:var(--muted);font-size:13px;text-align:center;padding:60px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── Badge ── */
-.badge{background:rgba(201,168,76,.12);color:var(--accent);font-size:11px;padding:2px 7px;border-radius:20px;border:1px solid rgba(201,168,76,.25)}
-.badge.green{background:rgba(76,175,125,.12);color:var(--green);border-color:rgba(76,175,125,.25)}
+.badge{font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid;font-weight:600;letter-spacing:.3px}
+.badge.amber{background:rgba(201,168,76,.1);color:var(--accent);border-color:rgba(201,168,76,.3)}
+.badge.green{background:rgba(76,175,125,.1);color:var(--green);border-color:rgba(76,175,125,.3)}
 
-/* ── Engagement ring ── */
-.eng-ring-wrap{display:flex;align-items:center;gap:20px;padding:10px 0}
-.eng-ring{position:relative;width:80px;height:80px;flex-shrink:0}
-.eng-ring svg{transform:rotate(-90deg)}
-.eng-ring-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:16px;font-weight:700;line-height:1.2}
-.eng-ring-label small{font-size:10px;color:var(--muted);font-weight:400}
-.eng-ring-details{flex:1}
-.eng-ring-details .erow{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border)}
-.eng-ring-details .erow:last-child{border-bottom:none}
-.erow .en{color:var(--muted)}
-.erow .ev{font-weight:600}
-
-/* ── Hour chart ── */
-.hour-chart{display:flex;align-items:flex-end;gap:3px;height:60px;margin-top:12px}
-.hour-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
-.hour-bar{width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;transition:height .4s}
-.hour-lbl{font-size:9px;color:var(--muted2)}
-
-/* ── Cost cards ── */
-.cost-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
-.cost-card{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;text-align:center}
-.cost-card .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px}
-.cost-card .val{font-size:22px;font-weight:700}
-.cost-card .sub{font-size:11px;color:var(--muted);margin-top:4px}
+/* ── Divider ── */
+.divider{height:1px;background:var(--border);margin:12px 0}
 </style>
 </head>
 <body>
@@ -155,8 +183,9 @@ canvas{display:block;width:100%!important;margin-top:10px}
 <!-- Login -->
 <div id="login-screen">
   <div class="login-box">
-    <h1>🔮 Shimal</h1>
-    <p>Admin Dashboard</p>
+    <div class="login-logo">🔮</div>
+    <h1>Shimal Admin</h1>
+    <p>Dashboard'a giriş yap</p>
     <input type="password" id="pwd-input" placeholder="Şifre" autofocus>
     <button onclick="doLogin()">Giriş Yap</button>
     <div id="login-error"></div>
@@ -167,7 +196,7 @@ canvas{display:block;width:100%!important;margin-top:10px}
 <div id="app">
   <header>
     <div class="header-left">
-      <h1>🔮 Shimal</h1>
+      <span class="brand">🔮 Shimal</span>
       <nav class="tabs">
         <button class="tab active" onclick="switchTab('overview',this)">Genel Bakış</button>
         <button class="tab" onclick="switchTab('monetization',this)">Maliyet & Bildirimler</button>
@@ -194,7 +223,7 @@ let cachedStats = null;
 let cachedTrend = null;
 let refreshTimer = null;
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 async function doLogin() {
   const pwd = document.getElementById('pwd-input').value;
   const err = document.getElementById('login-error');
@@ -215,8 +244,7 @@ document.getElementById('pwd-input').addEventListener('keydown', e => { if (e.ke
 
 function logout() {
   localStorage.removeItem('shimal_dash_token');
-  token = null;
-  clearInterval(refreshTimer);
+  token = null; clearInterval(refreshTimer);
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
 }
@@ -228,7 +256,7 @@ function showApp() {
   refreshTimer = setInterval(() => refresh(false), 2 * 60 * 1000);
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────────────────
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
 function switchTab(name, el) {
   currentTab = name;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -236,17 +264,12 @@ function switchTab(name, el) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('tab-' + name);
   if (panel) panel.classList.add('active');
-  // redraw charts when switching back to overview
   if (name === 'overview' && cachedTrend) {
-    requestAnimationFrame(() => {
-      drawDualChart('insight-chart', cachedTrend.days, 'Insight');
-      drawDualChart('growth-chart', cachedTrend.growth, 'Kayıt');
-      if (cachedStats?.supabase?.refreshHourDist) drawHourChart(cachedStats.supabase.refreshHourDist);
-    });
+    requestAnimationFrame(() => redrawCharts());
   }
 }
 
-// ── Fetch ─────────────────────────────────────────────────────────────────────
+// ─── Fetch ────────────────────────────────────────────────────────────────────
 async function apiFetch(path, force = false) {
   const url = `${BASE}${path}${force ? '?force=1' : ''}`;
   const r = await fetch(url, { headers: { 'x-dashboard-token': token } });
@@ -260,149 +283,184 @@ async function refresh(force = false) {
       apiFetch('/dashboard/stats', force),
       apiFetch('/dashboard/stats/insights', false),
     ]);
-    cachedStats = stats;
-    cachedTrend = trend;
+    cachedStats = stats; cachedTrend = trend;
     renderAll(stats, trend);
     document.getElementById('last-update').textContent =
-      new Date().toLocaleTimeString('tr-TR') + (stats.cached ? ' ·  önbellekten' : '');
+      new Date().toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit' });
   } catch(e) { console.error(e); }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const fmt     = n  => n == null ? '—' : Number(n).toLocaleString('tr-TR');
-const fmtUsd  = n  => n == null ? '—' : '$' + Number(n).toFixed(2);
-const fmtUsd3 = n  => n == null ? '—' : '$' + Number(n).toFixed(3);
-const pct     = (a,b) => b > 0 ? Math.round(a / b * 100) : 0;
-function fmtUptime(s) {
-  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmt    = n => n == null ? '—' : Number(n).toLocaleString('tr-TR');
+const fmtU   = n => n == null ? '—' : '$' + Number(n).toFixed(2);
+const fmtU3  = n => { if (n == null) return '—'; const v = Number(n); if (v === 0) return '$0'; if (v < 0.0001) return '$' + v.toFixed(6); if (v < 0.001) return '$' + v.toFixed(5); if (v < 0.01) return '$' + v.toFixed(4); return '$' + v.toFixed(3); };
+const pct    = (a, b) => b > 0 ? Math.round(a / b * 100) : 0;
+function fmtUp(s) {
+  const d = Math.floor(s/86400), h = Math.floor((s%86400)/3600), m = Math.floor((s%3600)/60);
   return `${d}g ${h}s ${m}d`;
 }
 function ago(iso) {
   if (!iso) return '—';
-  const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 60)    return Math.floor(diff) + 'sn önce';
-  if (diff < 3600)  return Math.floor(diff / 60) + 'dk önce';
-  if (diff < 86400) return Math.floor(diff / 3600) + 'sa önce';
-  return Math.floor(diff / 86400) + 'g önce';
+  const s = (Date.now() - new Date(iso)) / 1000;
+  if (s < 60) return Math.floor(s) + 'sn önce';
+  if (s < 3600) return Math.floor(s/60) + 'dk önce';
+  if (s < 86400) return Math.floor(s/3600) + 'sa önce';
+  return Math.floor(s/86400) + 'g önce';
 }
 const SIGN_TR = {Aries:'Koç',Taurus:'Boğa',Gemini:'İkizler',Cancer:'Yengeç',Leo:'Aslan',
   Virgo:'Başak',Libra:'Terazi',Scorpio:'Akrep',Sagittarius:'Yay',
   Capricorn:'Oğlak',Aquarius:'Kova',Pisces:'Balık'};
 const trSign = s => SIGN_TR[s] || s || '?';
-function dot(ok) { return `<span class="dot ${ok ? 'ok' : 'err'}"></span>`; }
+function dot(ok) { return `<span class="dot ${ok?'ok':'err'}"></span>`; }
 
-// ── Main render ───────────────────────────────────────────────────────────────
+// Delta badge helpers
+function deltaUp(val, suffix='') {
+  return `<span class="card-delta up">↑ ${val}${suffix}</span>`;
+}
+function deltaNeutral(val, suffix='') {
+  return `<span class="card-delta nt">${val}${suffix}</span>`;
+}
+
+// ─── Main render ──────────────────────────────────────────────────────────────
 function renderAll(stats, trend) {
   const sb = stats.supabase  || {};
   const an = stats.anthropic || {};
   const os = stats.onesignal || {};
   const sv = stats.server    || {};
 
-  const convRate     = pct(sb.premiumUsers, sb.totalUsers);
-  const pushRate     = pct(sb.usersWithPush, sb.totalUsers);
-  const eng7Rate     = pct(sb.activeUsers7d, sb.totalUsers);
-  const eng30Rate    = pct(sb.activeUsers30d, sb.totalUsers);
-  const costPerUser  = sb.activeUsers30d > 0 ? (an.costUsd || 0) / sb.activeUsers30d : null;
-  const costPerInsight = sb.insightsThisMonth > 0 ? (an.costUsd || 0) / sb.insightsThisMonth : null;
+  const pushRate          = pct(sb.usersWithPush, sb.totalUsers);
+  const convRate          = pct(sb.premiumUsers, sb.totalUsers);
+  const eng7Rate          = pct(sb.activeUsers7d, sb.totalUsers);
+  const eng30Rate         = pct(sb.activeUsers30d, sb.totalUsers);
+  const activationRate    = pct(sb.newUsersActivated, sb.newWeek);
+  const costPerUser       = sb.activeUsers30d > 0 ? (an.costUsd||0) / sb.activeUsers30d : null;
+  const costPerInsight    = sb.insightsThisMonth > 0 ? (an.costUsd||0) / sb.insightsThisMonth : null;
 
-  // ── Sign bars ─────────────────────────────────────────────────────────────
+  // ─── Sign bars ──────────────────────────────────────────────────────────────
   const signDist = sb.signDist || {};
   const maxSign  = Math.max(...Object.values(signDist), 1);
-  const signHTML = Object.entries(signDist).sort((a,b) => b[1]-a[1]).map(([s,c]) => `
+  const signHTML = Object.entries(signDist).sort((a,b)=>b[1]-a[1]).map(([s,c])=>`
     <div class="sign-bar">
       <div class="sign-name">${trSign(s)}</div>
       <div class="sign-track"><div class="sign-fill" style="width:${Math.round(c/maxSign*100)}%"></div></div>
       <div class="sign-count">${c}</div>
     </div>`).join('') || '<div class="empty">Veri yok</div>';
 
-  // ── Errors ────────────────────────────────────────────────────────────────
-  const errHTML = !(sv.recentErrors || []).length
-    ? '<div class="empty">Hata yok ✓</div>'
+  // ─── Error log ──────────────────────────────────────────────────────────────
+  const errHTML = !(sv.recentErrors||[]).length
+    ? '<div class="empty">✓ Hata yok</div>'
     : sv.recentErrors.map(e =>
         `<div class="error-item"><span class="error-ts">${e.ts.slice(11,19)}</span><span class="error-src">[${e.source}]</span><span class="error-msg">${e.message}</span></div>`
       ).join('');
 
-  // ── Funnel steps ──────────────────────────────────────────────────────────
-  const funnelSteps = [
-    { label: 'Kayıt Oldu',    n: sb.totalUsers,    color: '#5b8dee', base: sb.totalUsers },
-    { label: 'Push İzni',     n: sb.usersWithPush, color: '#9b7fe8', base: sb.totalUsers },
-    { label: 'Aktif (30g)',   n: sb.activeUsers30d,color: '#c9a84c', base: sb.totalUsers },
-    { label: 'Premium',       n: sb.premiumUsers,  color: '#4caf7d', base: sb.totalUsers },
+  // ─── Funnel ─────────────────────────────────────────────────────────────────
+  const fSteps = [
+    { label: 'Kayıt Oldu',  n: sb.totalUsers,     color: '#5b8dee' },
+    { label: 'Push İzni',   n: sb.usersWithPush,  color: '#9b7fe8' },
+    { label: 'Aktif (30g)', n: sb.activeUsers30d, color: '#c9a84c' },
+    { label: 'Premium',     n: sb.premiumUsers,   color: '#4caf7d' },
   ];
-
-  const funnelHTML = funnelSteps.map((step, i) => {
-    const p = step.base > 0 ? Math.round(step.n / step.base * 100) : 0;
-    const barW = Math.max(2, p);
-    const arrow = i < funnelSteps.length - 1
-      ? `<div class="funnel-arrow">↓ ${funnelSteps[i+1].n != null && step.n > 0 ? Math.round(funnelSteps[i+1].n/step.n*100) : '?'}% devam etti</div>`
-      : '';
+  const funnelHTML = fSteps.map((step, i) => {
+    const p    = pct(step.n, sb.totalUsers);
+    const barW = Math.max(1, p);
+    const drop = i < fSteps.length - 1 && fSteps[i].n > 0
+      ? `<div class="funnel-drop">↓ ${pct(fSteps[i+1].n, fSteps[i].n)}% devam etti</div>` : '';
     return `
       <div class="funnel-step">
         <div class="funnel-label">${step.label}</div>
         <div class="funnel-track">
-          <div class="funnel-fill" style="width:${barW}%;background:${step.color}">${p > 12 ? '%'+p : ''}</div>
+          <div class="funnel-fill" style="width:${barW}%;background:${step.color}">${p > 14 ? '%'+p : ''}</div>
         </div>
         <div class="funnel-meta">
           <span class="funnel-count">${fmt(step.n)}</span>
           <span class="funnel-pct">%${p}</span>
         </div>
-      </div>${arrow}`;
+      </div>${drop}`;
   }).join('');
 
-  // ── Engagement ring SVG ───────────────────────────────────────────────────
-  function engRing(val, color, label, sub) {
-    const r = 32, circ = 2 * Math.PI * r;
-    const dash = circ * (val / 100);
+  // ─── Engagement rings ────────────────────────────────────────────────────────
+  function ring(val, color, title, sub) {
+    const r = 28, circ = 2*Math.PI*r, dash = circ*(val/100);
     return `
-      <div class="eng-ring-wrap">
+      <div class="eng-item">
         <div class="eng-ring">
-          <svg width="80" height="80" viewBox="0 0 80 80">
-            <circle cx="40" cy="40" r="${r}" fill="none" stroke="var(--border)" stroke-width="7"/>
-            <circle cx="40" cy="40" r="${r}" fill="none" stroke="${color}" stroke-width="7"
+          <svg width="72" height="72" viewBox="0 0 72 72">
+            <circle cx="36" cy="36" r="${r}" fill="none" stroke="var(--border)" stroke-width="6"/>
+            <circle cx="36" cy="36" r="${r}" fill="none" stroke="${color}" stroke-width="6"
               stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"/>
           </svg>
           <div class="eng-ring-label">${val}<small>%</small></div>
         </div>
-        <div class="eng-ring-details">
-          <div style="font-size:14px;font-weight:700;margin-bottom:8px">${label}</div>
-          <div style="font-size:12px;color:var(--muted)">${sub}</div>
-        </div>
+        <div class="eng-title">${title}</div>
+        <div class="eng-sub">${sub}</div>
       </div>`;
   }
 
-  // ── Hour chart ────────────────────────────────────────────────────────────
+  // ─── Hour bars ───────────────────────────────────────────────────────────────
   const hourDist = sb.refreshHourDist || {};
   const hourMax  = Math.max(...Object.values(hourDist), 1);
-  const HOURS    = Array.from({length:24},(_,i)=>i);
-  const hourHTML = `<div class="hour-chart">${HOURS.map(h => {
-    const c = hourDist[h] || 0;
-    const ht = Math.round(c / hourMax * 52) + 2;
+  const hourHTML = `<div class="hour-chart">${Array.from({length:24},(_,h)=>{
+    const c = hourDist[h]||0;
+    const ht = Math.round(c/hourMax*46)+2;
     return `<div class="hour-bar-wrap">
-      <div class="hour-bar" style="height:${ht}px;opacity:${c ? 1 : 0.2}"></div>
+      <div class="hour-bar" style="height:${ht}px;opacity:${c?0.85:0.15}"></div>
       <div class="hour-lbl">${h%6===0?h:''}</div>
     </div>`;
   }).join('')}</div>`;
 
-  // ── Build HTML ────────────────────────────────────────────────────────────
+  // ─── Tracking cards ──────────────────────────────────────────────────────────
+  const churnColor   = (sb.churnRisk||0) > sb.totalUsers*0.5 ? '#e05c5c' : '#e8924a';
+  const successColor = (sb.insightSuccessRate||0) >= 80 ? '#4caf7d' : (sb.insightSuccessRate||0) >= 50 ? '#c9a84c' : '#e05c5c';
+  const actColor     = activationRate >= 60 ? '#4caf7d' : activationRate >= 30 ? '#c9a84c' : '#e05c5c';
+
+  const trackingHTML = `
+    <div class="tracking-row">
+      <div class="track-card">
+        <div class="track-icon orange">😴</div>
+        <div class="track-body">
+          <div class="track-label">Churn Riski</div>
+          <div class="track-val" style="color:${churnColor}">${fmt(sb.churnRisk)}</div>
+          <div class="track-sub">30g içinde insight almadı</div>
+        </div>
+      </div>
+      <div class="track-card">
+        <div class="track-icon green">🎯</div>
+        <div class="track-body">
+          <div class="track-label">AI Başarı Oranı</div>
+          <div class="track-val" style="color:${successColor}">%${sb.insightSuccessRate ?? '—'}</div>
+          <div class="track-sub">Bu ay push'lı kullanıcılara</div>
+        </div>
+      </div>
+      <div class="track-card">
+        <div class="track-icon purple">🚀</div>
+        <div class="track-body">
+          <div class="track-label">Yeni Kullanıcı Aktivasyon</div>
+          <div class="track-val" style="color:${actColor}">${fmt(sb.newUsersActivated)}/${fmt(sb.newWeek)}</div>
+          <div class="track-sub">Bu hafta kayıt → insight %${activationRate}</div>
+        </div>
+      </div>
+    </div>`;
+
+  // ─── Build HTML ──────────────────────────────────────────────────────────────
   document.getElementById('content').innerHTML = `
 
-  <!-- ══ TAB: GENEL BAKIŞ ══════════════════════════════════════════════════ -->
+  <!-- ══ GENEL BAKIŞ ══════════════════════════════════════════════════════ -->
   <div class="tab-panel ${currentTab==='overview'?'active':''}" id="tab-overview">
 
-    <!-- Top stat cards -->
     <div class="cards">
       <div class="card c-accent">
         <div class="card-label">Toplam Kullanıcı</div>
         <div class="card-value">${fmt(sb.totalUsers)}</div>
-        <div class="card-sub">+${fmt(sb.newToday)} bugün · +${fmt(sb.newWeek)} bu hafta</div>
+        <div class="card-sub">Bu hafta ${deltaUp(sb.newWeek)}</div>
+        <div class="card-sub" style="margin-top:2px">Bugün +${fmt(sb.newToday)}</div>
       </div>
       <div class="card c-blue">
-        <div class="card-label">7 Günlük Aktif</div>
+        <div class="card-label">7g Aktif</div>
         <div class="card-value">${fmt(sb.activeUsers7d)}</div>
         <div class="card-sub">%${eng7Rate} oran</div>
       </div>
       <div class="card c-purple">
-        <div class="card-label">30 Günlük Aktif</div>
+        <div class="card-label">30g Aktif</div>
         <div class="card-value">${fmt(sb.activeUsers30d)}</div>
         <div class="card-sub">%${eng30Rate} oran</div>
       </div>
@@ -423,61 +481,62 @@ function renderAll(stats, trend) {
       </div>
     </div>
 
-    <!-- Funnel + Engagement -->
+    ${trackingHTML}
+
     <div class="grid2">
       <div class="section">
-        <h2><span class="ico">🔽</span> Kullanıcı Dönüşüm Hunisi</h2>
+        <h2><span class="ico">🔽</span> Dönüşüm Hunisi</h2>
         <div class="funnel">${funnelHTML}</div>
       </div>
       <div class="section">
         <h2><span class="ico">⚡</span> Engagement</h2>
-        ${engRing(eng7Rate, 'var(--blue)', '7 Günlük Aktif Oran',
-          `${fmt(sb.activeUsers7d)} kullanıcı son 7 günde insight aldı`)}
-        <div style="height:1px;background:var(--border);margin:12px 0"></div>
-        ${engRing(eng30Rate, 'var(--purple)', '30 Günlük Aktif Oran',
-          `${fmt(sb.activeUsers30d)} kullanıcı son 30 günde insight aldı`)}
+        <div class="eng-grid">
+          ${ring(eng7Rate, '#5b8dee', '7 Günlük', `${fmt(sb.activeUsers7d)} kullanıcı`)}
+          ${ring(eng30Rate, '#9b7fe8', '30 Günlük', `${fmt(sb.activeUsers30d)} kullanıcı`)}
+        </div>
+        <div class="divider"></div>
+        <h2 style="margin-top:4px"><span class="ico">🕐</span> Tercih Edilen Saat</h2>
+        ${hourHTML}
       </div>
     </div>
 
-    <!-- Charts: Growth + Insights -->
     <div class="grid2">
       <div class="section">
         <h2><span class="ico">📈</span> Kullanıcı Büyümesi — 30 Gün</h2>
-        <canvas id="growth-chart" height="110"></canvas>
+        <div class="chart-wrap">
+          <canvas id="growth-chart" height="100"></canvas>
+          <div class="chart-tooltip" id="tt-growth"></div>
+        </div>
       </div>
       <div class="section">
         <h2><span class="ico">📅</span> Günlük Insightlar — 30 Gün</h2>
-        <canvas id="insight-chart" height="110"></canvas>
+        <div class="chart-wrap">
+          <canvas id="insight-chart" height="100"></canvas>
+          <div class="chart-tooltip" id="tt-insight"></div>
+        </div>
       </div>
     </div>
 
-    <!-- Preferred time -->
-    <div class="section">
-      <h2><span class="ico">🕐</span> Tercih Edilen Insight Saatleri</h2>
-      ${hourHTML}
-    </div>
+  </div>
 
-  </div><!-- /overview -->
-
-  <!-- ══ TAB: MALİYET & BİLDİRİMLER ══════════════════════════════════════ -->
+  <!-- ══ MALİYET & BİLDİRİMLER ════════════════════════════════════════════ -->
   <div class="tab-panel ${currentTab==='monetization'?'active':''}" id="tab-monetization">
 
-    <!-- Cost cards -->
     <div class="cost-grid">
       <div class="cost-card">
         <div class="lbl">Bu Ay Toplam</div>
-        <div class="val ${(an.costUsd||0) > 10 ? 'err' : 'ok'}">${fmtUsd(an.costUsd)}</div>
-        <div class="sub">${an.source === 'estimate' ? 'Tahmin' : 'Gerçek veri'}</div>
+        <div class="val ${(an.costUsd||0)>10?'err':'ok'}">${fmtU(an.costUsd)}</div>
+        <div class="sub">${an.source==='estimate'?'Tahmin':'Gerçek'}</div>
       </div>
       <div class="cost-card">
         <div class="lbl">Aktif Kullanıcı Başına</div>
-        <div class="val">${costPerUser != null ? fmtUsd3(costPerUser) : '—'}</div>
+        <div class="val">${costPerUser!=null?fmtU3(costPerUser):'—'}</div>
         <div class="sub">30g aktif / ay</div>
       </div>
       <div class="cost-card">
         <div class="lbl">Insight Başına</div>
-        <div class="val">${costPerInsight != null ? fmtUsd3(costPerInsight) : '—'}</div>
-        <div class="sub">${fmt(sb.insightsThisMonth)} insight bu ay</div>
+        <div class="val">${costPerInsight!=null?fmtU3(costPerInsight):'—'}</div>
+        <div class="sub">${fmt(sb.insightsThisMonth)} insight</div>
       </div>
       <div class="cost-card">
         <div class="lbl">AI İstekleri</div>
@@ -488,31 +547,30 @@ function renderAll(stats, trend) {
 
     <div class="grid2">
       <div class="section">
-        <h2><span class="ico">🤖</span> Anthropic API Detayı
-          <span class="badge ${an.source === 'estimate' ? '' : 'green'}">${an.source === 'estimate' ? 'Tahmin' : 'Gerçek'}</span>
+        <h2><span class="ico">🤖</span> Anthropic API
+          <span class="badge ${an.source==='estimate'?'amber':'green'}">${an.source==='estimate'?'Tahmin':'Gerçek'}</span>
         </h2>
-        <div class="metric-row"><span class="metric-name">Bu ay toplam maliyet</span><span class="metric-val ${(an.costUsd||0)>10?'err':'ok'}">${fmtUsd(an.costUsd)}</span></div>
+        <div class="metric-row"><span class="metric-name">Bu ay maliyet</span><span class="metric-val ${(an.costUsd||0)>10?'err':'ok'}">${fmtU(an.costUsd)}</span></div>
         <div class="metric-row"><span class="metric-name">Input token</span><span class="metric-val">${fmt(an.inputTokens)}</span></div>
         <div class="metric-row"><span class="metric-name">Output token</span><span class="metric-val">${fmt(an.outputTokens)}</span></div>
         <div class="metric-row"><span class="metric-name">Toplam istek</span><span class="metric-val">${fmt(an.requests)}</span></div>
         <div class="metric-row"><span class="metric-name">Bu ay insight</span><span class="metric-val">${fmt(sb.insightsThisMonth)}</span></div>
-        ${an.note ? `<div style="margin-top:10px;font-size:11px;color:var(--muted)">${an.note}</div>` : ''}
-        ${!an.ok ? `<div class="metric-row"><span class="metric-name">Hata</span><span class="metric-val err">${an.error}</span></div>` : ''}
+        ${!an.ok?`<div class="metric-row"><span class="metric-name">Hata</span><span class="metric-val err">${an.error}</span></div>`:''}
       </div>
       <div class="section">
         <h2><span class="ico">🔔</span> Push Bildirimleri (OneSignal)</h2>
         <div class="metric-row"><span class="metric-name">Kayıtlı cihaz</span><span class="metric-val">${fmt(os.players)}</span></div>
         <div class="metric-row"><span class="metric-name">Mesajlanabilir</span><span class="metric-val">${fmt(os.messagablePlayers)}</span></div>
-        <div class="metric-row"><span class="metric-name">Son 30 bildirim — gönderim</span><span class="metric-val">${fmt(os.totalSentRecent)}</span></div>
-        <div class="metric-row"><span class="metric-name">Tıklama oranı (CTR)</span><span class="metric-val ${(os.ctrPercent||0)>40?'ok':'warn'}">%${os.ctrPercent ?? '—'}</span></div>
+        <div class="metric-row"><span class="metric-name">Son 30 bildirim gönderim</span><span class="metric-val">${fmt(os.totalSentRecent)}</span></div>
+        <div class="metric-row"><span class="metric-name">Tıklama oranı (CTR)</span><span class="metric-val ${(os.ctrPercent||0)>40?'ok':'warn'}">%${os.ctrPercent??'—'}</span></div>
         <div class="metric-row"><span class="metric-name">Son bildirim</span><span class="metric-val">${ago(os.lastSentAt)}</span></div>
-        ${!os.ok ? `<div class="metric-row"><span class="metric-name">Hata</span><span class="metric-val err">${os.error||'Bağlanamadı'}</span></div>` : ''}
+        ${!os.ok?`<div class="metric-row"><span class="metric-name">Hata</span><span class="metric-val err">${os.error||'Bağlanamadı'}</span></div>`:''}
       </div>
     </div>
 
-  </div><!-- /monetization -->
+  </div>
 
-  <!-- ══ TAB: SİSTEM ═══════════════════════════════════════════════════════ -->
+  <!-- ══ SİSTEM ════════════════════════════════════════════════════════════ -->
   <div class="tab-panel ${currentTab==='system'?'active':''}" id="tab-system">
 
     <div class="grid2">
@@ -522,7 +580,7 @@ function renderAll(stats, trend) {
         <div class="metric-row"><span class="metric-name">Veritabanı</span><span class="metric-val ${sb.ok?'ok':'err'}">${dot(sb.ok)}${sb.ok?'Bağlı':'Hata'}</span></div>
         <div class="metric-row"><span class="metric-name">Anthropic API</span><span class="metric-val ${an.ok?'ok':'err'}">${dot(an.ok)}${an.ok?'Aktif':'Hata'}</span></div>
         <div class="metric-row"><span class="metric-name">OneSignal</span><span class="metric-val ${os.ok?'ok':'warn'}">${dot(os.ok)}${os.ok?'Aktif':'Bağlanamadı'}</span></div>
-        <div class="metric-row"><span class="metric-name">Uptime</span><span class="metric-val">${fmtUptime(sv.uptime||0)}</span></div>
+        <div class="metric-row"><span class="metric-name">Uptime</span><span class="metric-val">${fmtUp(sv.uptime||0)}</span></div>
         <div class="metric-row"><span class="metric-name">Node.js</span><span class="metric-val">${sv.nodeVersion||'—'}</span></div>
         <div class="metric-row"><span class="metric-name">Ortam</span><span class="metric-val">${sv.env||'—'}</span></div>
       </div>
@@ -537,63 +595,86 @@ function renderAll(stats, trend) {
       <div style="columns:2;gap:20px">${signHTML}</div>
     </div>
 
-  </div><!-- /system -->
+  </div>
   `;
 
-  // Draw charts (only if overview tab is active)
   if (currentTab === 'overview') {
-    requestAnimationFrame(() => {
-      drawDualChart('growth-chart',  trend.growth || [], 'var(--green)');
-      drawDualChart('insight-chart', trend.days   || [], 'var(--blue)');
-    });
+    requestAnimationFrame(() => redrawCharts());
   }
 }
 
-// ── Bar chart (reusable) ──────────────────────────────────────────────────────
-function drawDualChart(id, data, color) {
+// ─── Charts ───────────────────────────────────────────────────────────────────
+function redrawCharts() {
+  if (!cachedTrend) return;
+  drawBarChart('growth-chart',  cachedTrend.growth || [], '#4caf7d', 'tt-growth');
+  drawBarChart('insight-chart', cachedTrend.days   || [], '#5b8dee', 'tt-insight');
+}
+
+function drawBarChart(id, data, color, tooltipId) {
   const canvas = document.getElementById(id);
-  if (!canvas || !data || !data.length) return;
+  if (!canvas || !data.length) return;
   const ctx = canvas.getContext('2d');
-  const W = canvas.parentElement.clientWidth - 40;
-  const H = 110;
+  const W = canvas.parentElement.clientWidth - 2;
+  const H = 100;
   canvas.width = W; canvas.height = H;
 
-  const max  = Math.max(...data.map(d => d.count), 1);
-  const barW = Math.max(2, Math.floor((W - 20) / data.length) - 2);
-  const today = new Date().toISOString().split('T')[0];
+  const max     = Math.max(...data.map(d => d.count), 1);
+  const padL    = 8, padR = 8, padB = 16, padT = 6;
+  const plotW   = W - padL - padR;
+  const plotH   = H - padB - padT;
+  const barW    = Math.max(2, Math.floor(plotW / data.length) - 2);
+  const today   = new Date().toISOString().split('T')[0];
 
   ctx.clearRect(0, 0, W, H);
 
-  // Grid
+  // Grid lines
   ctx.strokeStyle = '#252a35'; ctx.lineWidth = 1;
-  [.25,.5,.75,1].forEach(f => {
-    const y = Math.floor(H - 18 - f * (H - 28));
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  [.33, .66, 1].forEach(f => {
+    const y = Math.round(padT + plotH * (1 - f));
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
   });
 
-  // Bars
+  // Bars + hit areas stored for tooltip
+  canvas._bars = [];
   data.forEach((d, i) => {
-    const x = 10 + i * (barW + 2);
-    const h = Math.max(2, Math.round(d.count / max * (H - 28)));
-    const y = H - 18 - h;
+    const bh  = Math.max(2, Math.round(d.count / max * plotH));
+    const x   = padL + i * (barW + 2);
+    const y   = padT + plotH - bh;
     const isToday = d.date === today;
-    ctx.fillStyle = d.count === 0 ? '#252a35' : isToday ? 'var(--accent)' : color;
-    ctx.beginPath(); ctx.roundRect(x, y, barW, h, 2); ctx.fill();
+    ctx.fillStyle = d.count === 0 ? '#252a35' : isToday ? '#c9a84c' : color;
+    ctx.globalAlpha = d.count === 0 ? 0.4 : 1;
+    ctx.beginPath(); ctx.roundRect(x, y, barW, bh, [2, 2, 0, 0]); ctx.fill();
+    ctx.globalAlpha = 1;
+    canvas._bars.push({ x, y: padT, w: barW + 2, h: H - padB, date: d.date, count: d.count });
 
-    // Tooltip on hover is done below
+    // X labels every 5 bars
     if (i % 5 === 0 || i === data.length - 1) {
-      ctx.fillStyle = '#7a8099'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#4a5068'; ctx.font = '9px system-ui'; ctx.textAlign = 'center';
       ctx.fillText(d.date.slice(5), x + barW / 2, H - 3);
     }
   });
+
+  // Tooltip on hover
+  const tt = document.getElementById(tooltipId);
+  if (!tt) return;
+  canvas.onmousemove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const bar = canvas._bars.find(b => mx >= b.x && mx < b.x + b.w);
+    if (bar) {
+      tt.style.display = 'block';
+      tt.innerHTML = `<strong>${bar.date}</strong>${bar.count}`;
+      const tx = e.clientX - rect.left - 40;
+      tt.style.left = Math.max(0, tx) + 'px';
+      tt.style.top  = '0px';
+    } else {
+      tt.style.display = 'none';
+    }
+  };
+  canvas.onmouseleave = () => { tt.style.display = 'none'; };
 }
 
-// ── Hour chart (already inline HTML, no canvas needed) ────────────────────────
-function drawHourChart(hourDist) {
-  // Hour chart is rendered inline as HTML divs, already done in renderAll
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ─── Init ─────────────────────────────────────────────────────────────────────
 if (token) showApp();
 </script>
 </body>
