@@ -94,32 +94,57 @@ async function getSupabaseStats() {
       return parseInt((r.headers.get('content-range') || '0/0').split('/')[1] || '0', 10);
     };
 
-    const today   = new Date().toISOString().split('T')[0];
-    const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+    const now      = new Date();
+    const today    = now.toISOString().split('T')[0];
+    const weekAgo  = new Date(Date.now() - 7 * 86400_000).toISOString();
+    const day7Ago  = new Date(Date.now() - 7  * 86400_000).toISOString().split('T')[0];
+    const day30Ago = new Date(Date.now() - 30 * 86400_000).toISOString().split('T')[0];
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
-    const [totalUsers, usersWithPush, premiumUsers, newToday, newWeek, insightsToday] = await Promise.all([
+    const [totalUsers, usersWithPush, premiumUsers, newToday, newWeek, insightsToday, insightsThisMonth] = await Promise.all([
       count('users?select=id'),
       count('users?select=id&push_token=not.is.null'),
       count('users?select=id&is_premium=eq.true'),
       count(`users?select=id&created_at=gte.${today}T00:00:00Z`),
       count(`users?select=id&created_at=gte.${weekAgo}`),
       count(`daily_insights?select=id&date=eq.${today}`),
+      count(`daily_insights?select=id&date=gte.${monthStart}`),
     ]);
 
-    // Sun sign dağılımı
-    const signRes = await fetch(`${SURL}/rest/v1/users?select=sun_sign`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
-    });
-    const allUsers = await signRes.json();
+    // Sun sign + refresh hour dağılımı ve aktif kullanıcılar tek sorguda
+    const [usersRes, active7Res, active30Res] = await Promise.all([
+      fetch(`${SURL}/rest/v1/users?select=sun_sign,refresh_hour`, {
+        headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+      }),
+      fetch(`${SURL}/rest/v1/daily_insights?select=user_id&date=gte.${day7Ago}`, {
+        headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+      }),
+      fetch(`${SURL}/rest/v1/daily_insights?select=user_id&date=gte.${day30Ago}`, {
+        headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+      }),
+    ]);
+
+    const allUsers   = await usersRes.json();
+    const active7Raw  = await active7Res.json();
+    const active30Raw = await active30Res.json();
+
     const signDist = {};
+    const refreshHourDist = {};
     if (Array.isArray(allUsers)) {
       for (const u of allUsers) {
         const s = u.sun_sign || 'Unknown';
         signDist[s] = (signDist[s] || 0) + 1;
+        const hr = u.refresh_hour ?? 8;
+        refreshHourDist[hr] = (refreshHourDist[hr] || 0) + 1;
       }
     }
 
-    return { ok: true, totalUsers, usersWithPush, premiumUsers, newToday, newWeek, insightsToday, signDist };
+    const activeUsers7d  = Array.isArray(active7Raw)  ? new Set(active7Raw.map(r => r.user_id)).size  : 0;
+    const activeUsers30d = Array.isArray(active30Raw) ? new Set(active30Raw.map(r => r.user_id)).size : 0;
+
+    return { ok: true, totalUsers, usersWithPush, premiumUsers, newToday, newWeek,
+             insightsToday, insightsThisMonth, activeUsers7d, activeUsers30d,
+             signDist, refreshHourDist };
   } catch (err) {
     logError('supabase', err.message);
     return { ok: false, error: err.message };
@@ -133,22 +158,40 @@ async function getInsightTrend() {
     const KEY  = process.env.SUPABASE_SERVICE_KEY;
     const since = new Date(Date.now() - 30 * 86400_000).toISOString().split('T')[0];
 
-    const res = await fetch(
-      `${SURL}/rest/v1/daily_insights?select=date&date=gte.${since}&order=date.asc`,
-      { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } }
-    );
-    const rows = await res.json();
-    if (!Array.isArray(rows)) return { ok: false, days: [] };
+    const [insightRes, userRes] = await Promise.all([
+      fetch(
+        `${SURL}/rest/v1/daily_insights?select=date&date=gte.${since}&order=date.asc`,
+        { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } }
+      ),
+      fetch(
+        `${SURL}/rest/v1/users?select=created_at&created_at=gte.${since}T00:00:00Z&order=created_at.asc`,
+        { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } }
+      ),
+    ]);
 
-    const byDate = {};
-    for (const r of rows) byDate[r.date] = (byDate[r.date] || 0) + 1;
+    const rows     = await insightRes.json();
+    const userRows = await userRes.json();
 
-    const days = [];
+    if (!Array.isArray(rows)) return { ok: false, days: [], growth: [] };
+
+    const byDate   = {};
+    const byRegDay = {};
+    for (const r of rows)     byDate[r.date]  = (byDate[r.date]  || 0) + 1;
+    if (Array.isArray(userRows)) {
+      for (const u of userRows) {
+        const d = u.created_at?.split('T')[0];
+        if (d) byRegDay[d] = (byRegDay[d] || 0) + 1;
+      }
+    }
+
+    const days   = [];
+    const growth = [];
     for (let i = 29; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400_000).toISOString().split('T')[0];
       days.push({ date: d, count: byDate[d] || 0 });
+      growth.push({ date: d, count: byRegDay[d] || 0 });
     }
-    return { ok: true, days };
+    return { ok: true, days, growth };
   } catch (err) {
     logError('supabase-trend', err.message);
     return { ok: false, error: err.message, days: [] };
