@@ -18,7 +18,8 @@ if (missingVars.length > 0) {
 }
 
 const http = require('http');
-const cron = require('node-cron');
+const cron    = require('node-cron');
+const SunCalc = require('suncalc');
 const supabase = require('./config/supabase');
 const { setSecurityHeaders, checkApiKey, writeJson, notFound, internalError, getRequestUrl } = require('./utils/http');
 const { checkRateLimit } = require('./utils/rate-limit');
@@ -185,149 +186,204 @@ server.listen(PORT, () => {
 });
 
 // ─── Cron jobs ────────────────────────────────────────────────────────────────
-// Her dakika çalışır — her kullanıcının kendi timezone + seçtiği saate göre
-// insight üretir ve push bildirim gönderir.
+// ─── Cron yardımcıları ────────────────────────────────────────────────────────
+
+// Kullanıcının timezone'undaki saat/dakikayı döndürür
+function getLocalHM(date, timezone) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(date);
+    return {
+      hour:   parseInt(parts.find(p => p.type === 'hour')?.value   ?? '0', 10),
+      minute: parseInt(parts.find(p => p.type === 'minute')?.value ?? '0', 10),
+    };
+  } catch { return { hour: 0, minute: 0 }; }
+}
+
+// Hedef saatten sonra en fazla 5 dakika geçmişse true döndürür
+function isWithin5Min(lh, lm, targetH, targetM) {
+  const nowMins  = lh * 60 + lm;
+  const tgtMins  = targetH * 60 + targetM;
+  const diff = ((nowMins - tgtMins) + 1440) % 1440;
+  return diff < 5;
+}
+
+// Kullanıcının doğum koordinatlarından bugünkü gündoğumu saatini hesaplar
+// Koordinat yoksa timezone'a göre mevsimsel tahmin kullanır
+function getSunriseHM(user, date) {
+  const tz  = user.timezone || 'Europe/Istanbul';
+  const lat = parseFloat(user.birth_latitude);
+  const lon = parseFloat(user.birth_longitude);
+  try {
+    if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
+      const times = SunCalc.getTimes(date, lat, lon);
+      if (times.sunrise && !isNaN(times.sunrise.getTime())) {
+        return getLocalHM(times.sunrise, tz);
+      }
+    }
+  } catch { /* fall through */ }
+  // Fallback: Türkiye için aylık ortalama gündoğumu saatleri (UTC+3)
+  const month = date.getMonth(); // 0=Ocak … 11=Aralık
+  const hours = [8, 7, 7, 6, 6, 5, 5, 6, 6, 7, 7, 8];
+  return { hour: hours[month], minute: 0 };
+}
+
+// Günlük push takibi (in-memory, server restart'ta sıfırlanır)
+// Her gün gece yarısı temizlenir
+const pushSent = {
+  morning:   new Set(), // gündoğumu bildirimi
+  afternoon: new Set(), // öğle hatırlatması
+  evening:   new Set(), // akşam hatırlatması
+};
+
+// Kullanıcı listesi cache (dakikada 1 DB çekmemek için)
+let usersCache     = null;
+let usersCacheTime = 0;
+const USERS_TTL    = 5 * 60 * 1000; // 5 dk
+
+async function getCachedUsers() {
+  if (!usersCache || Date.now() - usersCacheTime > USERS_TTL) {
+    const { data } = await supabase
+      .from('users')
+      .select('*')
+      .not('push_token', 'is', null)
+      .not('natal_planets', 'is', null);
+    usersCache     = data || [];
+    usersCacheTime = Date.now();
+    console.log(`[Cache] ${usersCache.length} kullanıcı yüklendi.`);
+  }
+  return usersCache;
+}
+
+// ─── CRON 1 — Her sabah 03:00 UTC: Tüm insightları toplu üret ────────────────
+// Gündoğumundan ÖNCE tüm kullanıcılara ait insight hazırlanır.
+// generateInsightForUser zaten bugün varsa skip eder — güvenli çalıştırılabilir.
+
+cron.schedule('0 3 * * *', async () => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    console.log(`[DailyGen] ${today} için toplu insight üretimi başlıyor...`);
+
+    usersCache = null; // cache'i yenile
+    const users = await getCachedUsers();
+    if (!users.length) return;
+
+    let generated = 0, skipped = 0, errors = 0;
+    const BATCH = 3; // Anthropic rate limit'e saygı
+    for (let i = 0; i < users.length; i += BATCH) {
+      const batch = users.slice(i, i + BATCH);
+      await Promise.allSettled(batch.map(async (user) => {
+        try {
+          const result = await generateInsightForUser(user, today);
+          if (result === 'skipped') { skipped++; return; }
+          generated++;
+        } catch (err) {
+          errors++;
+          console.error(`[DailyGen] ✗ ${user.id}:`, err.message);
+        }
+      }));
+      // Batch'ler arasında kısa bekleme
+      if (i + BATCH < users.length) await new Promise(r => setTimeout(r, 500));
+    }
+
+    console.log(`[DailyGen] Tamamlandı: ${generated} üretildi, ${skipped} atlandı, ${errors} hata.`);
+  } catch (err) {
+    console.error('[DailyGen] Genel hata:', err.message);
+  }
+}, { timezone: 'UTC' });
+
+// ─── CRON 2 — Her dakika: 3 farklı saatte push bildirim gönder ───────────────
+// • Sabah  → Gündoğumu saatinde: AI insight bildirimi
+// • Öğlen  → 13:00 yerel saatte: hatırlatma
+// • Akşam  → 20:00 yerel saatte: hatırlatma
 
 cron.schedule('* * * * *', async () => {
   try {
     const now   = new Date();
     const today = now.toISOString().split('T')[0];
+    const users = await getCachedUsers();
+    if (!users.length) return;
 
-    // Push token'ı olan ve natal planets kaydı olan tüm kullanıcılar
-    const { data: users, error } = await supabase
-      .from('users')
-      .select('*')
-      .not('push_token', 'is', null)
-      .not('natal_planets', 'is', null);
+    // Her kullanıcı için hangi push penceresi açık?
+    const morningDue   = [];
+    const afternoonDue = [];
+    const eveningDue   = [];
 
-    if (error || !users?.length) return;
+    for (const user of users) {
+      const tz          = user.timezone || 'Europe/Istanbul';
+      const { hour, minute } = getLocalHM(now, tz);
+      const sunrise     = getSunriseHM(user, now);
 
-    // Şu an kimin refresh zamanı gelmiş?
-    // 5 dakikalık pencere: tam dakika eşleşmesi yerine son 5 dakika içinde geçtiyse yakala
-    // (kısa server restart'larında kaçırılan kullanıcıları absorbe eder)
-    const due = users.filter((user) => {
-      const tz     = user.timezone || 'Europe/Istanbul';
-      const hour   = user.refresh_hour   ?? 8;
-      const minute = user.refresh_minute ?? 30;
-      try {
-        const parts = new Intl.DateTimeFormat('en-GB', {
-          timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
-        }).formatToParts(now);
-        const lh = parseInt(parts.find(p => p.type === 'hour')?.value   ?? '0', 10);
-        const lm = parseInt(parts.find(p => p.type === 'minute')?.value ?? '0', 10);
-        const nowMins  = lh * 60 + lm;
-        const prefMins = hour * 60 + minute;
-        // Gece yarısı geçişini de doğru handle et (örn: 23:58 → 00:02)
-        const diff = ((nowMins - prefMins) + 1440) % 1440;
-        return diff < 5; // Son 5 dakika içinde geçtiyse due
-      } catch {
-        return false;
-      }
-    });
+      if (!pushSent.morning.has(user.id)   && isWithin5Min(hour, minute, sunrise.hour, sunrise.minute)) morningDue.push(user);
+      if (!pushSent.afternoon.has(user.id) && isWithin5Min(hour, minute, 13, 0))  afternoonDue.push(user);
+      if (!pushSent.evening.has(user.id)   && isWithin5Min(hour, minute, 20, 0))  eveningDue.push(user);
+    }
 
-    if (!due.length) return;
+    // ── Sabah: AI insight bildirimi ──────────────────────────────────────────
+    if (morningDue.length) {
+      console.log(`[Push-Sabah] ${morningDue.length} kullanıcıya gündoğumu bildirimi...`);
+      // Bugünkü insight'ları tek sorguda çek
+      const { data: insights } = await supabase
+        .from('daily_insights')
+        .select('user_id, notification_text')
+        .eq('date', today);
+      const insightMap = Object.fromEntries((insights || []).map(r => [r.user_id, r.notification_text]));
 
-    console.log(`[Cron] ${due.length} kullanıcı için insight üretimi başlıyor...`);
-
-    // 3'lü batch — Anthropic rate limit'e saygı
-    const BATCH = 3;
-    for (let i = 0; i < due.length; i += BATCH) {
-      const batch = due.slice(i, i + BATCH);
-      await Promise.allSettled(batch.map(async (user) => {
+      await Promise.allSettled(morningDue.map(async (user) => {
         try {
-          const result = await generateInsightForUser(user, today);
-          if (result === 'skipped') return;
-
-          // Insight üretildi — push bildirim gönder
-          const name = user.preferred_name || '';
-          const body = typeof result === 'string' ? result
-            : (name ? `${name}, bugünkü kozmik rehberliğin hazır.`
-                    : 'Bugünkü kozmik rehberliğiniz hazır.');
+          const name    = user.preferred_name || '';
+          const notifTxt = insightMap[user.id];
+          const body    = notifTxt || (name
+            ? `${name}, bugünkü kozmik rehberliğin hazır. 🌅`
+            : 'Bugünkü kozmik rehberliğiniz hazır. 🌅');
           const heading = name ? `Shimal · ${name}` : 'Shimal';
-
-          await sendPushNotification(user.push_token, body, heading, {
-            type: 'daily_insight', date: today,
-          });
-
-          console.log(`[Cron] ✓ ${user.id} (${user.sun_sign})`);
-        } catch (err) {
-          console.error(`[Cron] ✗ ${user.id}:`, err.message);
-        }
+          await sendPushNotification(user.push_token, body, heading, { type: 'daily_insight', date: today });
+          pushSent.morning.add(user.id);
+        } catch (err) { console.error(`[Push-Sabah] ✗ ${user.id}:`, err.message); }
       }));
     }
 
-    console.log(`[Cron] Tamamlandı: ${today}`);
+    // ── Öğlen: Hatırlatma ────────────────────────────────────────────────────
+    if (afternoonDue.length) {
+      console.log(`[Push-Öğlen] ${afternoonDue.length} kullanıcıya öğle hatırlatması...`);
+      await Promise.allSettled(afternoonDue.map(async (user) => {
+        try {
+          const name    = user.preferred_name || '';
+          const body    = name
+            ? `${name}, günün ortasında bir dakikan var mı? ✨`
+            : 'Günün ortasında bir dakikan var mı? ✨';
+          await sendPushNotification(user.push_token, body, 'Shimal', { type: 'reminder', period: 'afternoon' });
+          pushSent.afternoon.add(user.id);
+        } catch (err) { console.error(`[Push-Öğlen] ✗ ${user.id}:`, err.message); }
+      }));
+    }
+
+    // ── Akşam: Hatırlatma ────────────────────────────────────────────────────
+    if (eveningDue.length) {
+      console.log(`[Push-Akşam] ${eveningDue.length} kullanıcıya akşam hatırlatması...`);
+      await Promise.allSettled(eveningDue.map(async (user) => {
+        try {
+          const name    = user.preferred_name || '';
+          const body    = name
+            ? `${name}, bugünü nasıl kapattın? Shimal seni bekliyor 🌙`
+            : 'Bugünü nasıl kapattın? Shimal seni bekliyor 🌙';
+          await sendPushNotification(user.push_token, body, 'Shimal', { type: 'reminder', period: 'evening' });
+          pushSent.evening.add(user.id);
+        } catch (err) { console.error(`[Push-Akşam] ✗ ${user.id}:`, err.message); }
+      }));
+    }
+
   } catch (err) {
-    console.error('[Cron] Genel hata:', err.message);
+    console.error('[Push-Cron] Genel hata:', err.message);
   }
 }, { timezone: 'UTC' });
 
-// ─── Günlük Güvenlik Ağı ─────────────────────────────────────────────────────
-// Her gece 21:00 UTC (gece yarısı İstanbul = yeni günün başlangıcı)
-// O güne ait insight'ı olmayan TÜM kullanıcılara üretir + push gönderir.
-// İstisnasız her kullanıcının her gün insight almasını garanti eder.
-cron.schedule('0 21 * * *', async () => {
-  try {
-    const now   = new Date();
-    const today = now.toISOString().split('T')[0];
-    console.log(`[SafetyNet] ${today} için eksik insight taraması başlıyor...`);
-
-    const { data: users, error } = await supabase
-      .from('users')
-      .select('*')
-      .not('push_token', 'is', null)
-      .not('natal_planets', 'is', null);
-
-    if (error || !users?.length) {
-      console.log('[SafetyNet] Kullanıcı bulunamadı veya hata:', error?.message);
-      return;
-    }
-
-    // Bugün zaten insight almış kullanıcıların ID'lerini çek
-    const { data: todayInsights } = await supabase
-      .from('daily_insights')
-      .select('user_id')
-      .eq('date', today);
-
-    const doneSet = new Set((todayInsights || []).map(r => r.user_id));
-    const missing = users.filter(u => !doneSet.has(u.id));
-
-    if (!missing.length) {
-      console.log(`[SafetyNet] Tüm kullanıcılar bugün insight aldı. ✓`);
-      return;
-    }
-
-    console.log(`[SafetyNet] ${missing.length} kullanıcı eksik, üretim başlıyor...`);
-
-    const BATCH = 3;
-    let generated = 0;
-    for (let i = 0; i < missing.length; i += BATCH) {
-      const batch = missing.slice(i, i + BATCH);
-      await Promise.allSettled(batch.map(async (user) => {
-        try {
-          const result = await generateInsightForUser(user, today);
-          if (result === 'skipped') return;
-
-          generated++;
-          const name    = user.preferred_name || '';
-          const body    = typeof result === 'string' ? result
-            : (name ? `${name}, bugünkü kozmik rehberliğin hazır.`
-                    : 'Bugünkü kozmik rehberliğiniz hazır.');
-          const heading = name ? `Shimal · ${name}` : 'Shimal';
-
-          await sendPushNotification(user.push_token, body, heading, {
-            type: 'daily_insight', date: today,
-          });
-
-          console.log(`[SafetyNet] ✓ ${user.id} (${user.sun_sign})`);
-        } catch (err) {
-          console.error(`[SafetyNet] ✗ ${user.id}:`, err.message);
-        }
-      }));
-    }
-
-    console.log(`[SafetyNet] Tamamlandı: ${generated} insight üretildi, ${missing.length - generated} atlandı.`);
-  } catch (err) {
-    console.error('[SafetyNet] Genel hata:', err.message);
-  }
+// ─── CRON 3 — Gece yarısı 00:00 UTC: push takibini sıfırla ──────────────────
+cron.schedule('0 0 * * *', () => {
+  pushSent.morning.clear();
+  pushSent.afternoon.clear();
+  pushSent.evening.clear();
+  usersCache = null; // yeni gün, yeni kullanıcı cache'i
+  console.log('[Cron] Push takibi ve kullanıcı cache temizlendi.');
 }, { timezone: 'UTC' });
