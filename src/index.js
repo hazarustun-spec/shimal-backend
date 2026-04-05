@@ -203,6 +203,8 @@ cron.schedule('* * * * *', async () => {
     if (error || !users?.length) return;
 
     // Şu an kimin refresh zamanı gelmiş?
+    // 5 dakikalık pencere: tam dakika eşleşmesi yerine son 5 dakika içinde geçtiyse yakala
+    // (kısa server restart'larında kaçırılan kullanıcıları absorbe eder)
     const due = users.filter((user) => {
       const tz     = user.timezone || 'Europe/Istanbul';
       const hour   = user.refresh_hour   ?? 8;
@@ -213,7 +215,11 @@ cron.schedule('* * * * *', async () => {
         }).formatToParts(now);
         const lh = parseInt(parts.find(p => p.type === 'hour')?.value   ?? '0', 10);
         const lm = parseInt(parts.find(p => p.type === 'minute')?.value ?? '0', 10);
-        return lh === hour && lm === minute;
+        const nowMins  = lh * 60 + lm;
+        const prefMins = hour * 60 + minute;
+        // Gece yarısı geçişini de doğru handle et (örn: 23:58 → 00:02)
+        const diff = ((nowMins - prefMins) + 1440) % 1440;
+        return diff < 5; // Son 5 dakika içinde geçtiyse due
       } catch {
         return false;
       }
@@ -253,5 +259,75 @@ cron.schedule('* * * * *', async () => {
     console.log(`[Cron] Tamamlandı: ${today}`);
   } catch (err) {
     console.error('[Cron] Genel hata:', err.message);
+  }
+}, { timezone: 'UTC' });
+
+// ─── Günlük Güvenlik Ağı ─────────────────────────────────────────────────────
+// Her gece 21:00 UTC (gece yarısı İstanbul = yeni günün başlangıcı)
+// O güne ait insight'ı olmayan TÜM kullanıcılara üretir + push gönderir.
+// İstisnasız her kullanıcının her gün insight almasını garanti eder.
+cron.schedule('0 21 * * *', async () => {
+  try {
+    const now   = new Date();
+    const today = now.toISOString().split('T')[0];
+    console.log(`[SafetyNet] ${today} için eksik insight taraması başlıyor...`);
+
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .not('push_token', 'is', null)
+      .not('natal_planets', 'is', null);
+
+    if (error || !users?.length) {
+      console.log('[SafetyNet] Kullanıcı bulunamadı veya hata:', error?.message);
+      return;
+    }
+
+    // Bugün zaten insight almış kullanıcıların ID'lerini çek
+    const { data: todayInsights } = await supabase
+      .from('daily_insights')
+      .select('user_id')
+      .eq('date', today);
+
+    const doneSet = new Set((todayInsights || []).map(r => r.user_id));
+    const missing = users.filter(u => !doneSet.has(u.id));
+
+    if (!missing.length) {
+      console.log(`[SafetyNet] Tüm kullanıcılar bugün insight aldı. ✓`);
+      return;
+    }
+
+    console.log(`[SafetyNet] ${missing.length} kullanıcı eksik, üretim başlıyor...`);
+
+    const BATCH = 3;
+    let generated = 0;
+    for (let i = 0; i < missing.length; i += BATCH) {
+      const batch = missing.slice(i, i + BATCH);
+      await Promise.allSettled(batch.map(async (user) => {
+        try {
+          const result = await generateInsightForUser(user, today);
+          if (result === 'skipped') return;
+
+          generated++;
+          const name    = user.preferred_name || '';
+          const body    = typeof result === 'string' ? result
+            : (name ? `${name}, bugünkü kozmik rehberliğin hazır.`
+                    : 'Bugünkü kozmik rehberliğiniz hazır.');
+          const heading = name ? `Shimal · ${name}` : 'Shimal';
+
+          await sendPushNotification(user.push_token, body, heading, {
+            type: 'daily_insight', date: today,
+          });
+
+          console.log(`[SafetyNet] ✓ ${user.id} (${user.sun_sign})`);
+        } catch (err) {
+          console.error(`[SafetyNet] ✗ ${user.id}:`, err.message);
+        }
+      }));
+    }
+
+    console.log(`[SafetyNet] Tamamlandı: ${generated} insight üretildi, ${missing.length - generated} atlandı.`);
+  } catch (err) {
+    console.error('[SafetyNet] Genel hata:', err.message);
   }
 }, { timezone: 'UTC' });
