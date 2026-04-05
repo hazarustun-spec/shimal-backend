@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shimal Admin</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f14;--card:#161921;--border:#252a35;--text:#e8eaf0;--muted:#7a8099;
+  --accent:#c9a84c;--green:#4caf7d;--red:#e05c5c;--blue:#5b8dee;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+
+/* ── Login ── */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px;width:340px;text-align:center}
+.login-box h1{font-size:28px;color:var(--accent);margin-bottom:6px}
+.login-box p{color:var(--muted);font-size:14px;margin-bottom:28px}
+.login-box input{width:100%;background:#0d0f14;border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-size:15px;outline:none;margin-bottom:12px}
+.login-box input:focus{border-color:var(--accent)}
+.login-box button{width:100%;background:var(--accent);color:#0d0f14;font-weight:700;font-size:15px;padding:12px;border:none;border-radius:8px;cursor:pointer}
+.login-box button:hover{opacity:.9}
+#login-error{color:var(--red);font-size:13px;margin-top:10px;min-height:18px}
+
+/* ── App ── */
+#app{display:none}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:10}
+header h1{font-size:20px;color:var(--accent);letter-spacing:.5px}
+.header-right{display:flex;align-items:center;gap:12px}
+.refresh-btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+.refresh-btn:hover{border-color:var(--accent)}
+.last-update{color:var(--muted);font-size:12px}
+.logout-btn{color:var(--muted);font-size:13px;cursor:pointer;background:none;border:none}
+.logout-btn:hover{color:var(--red)}
+
+main{padding:24px;max-width:1400px;margin:0 auto}
+
+/* ── Stat cards row ── */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+.card-label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+.card-value{font-size:28px;font-weight:700;line-height:1}
+.card-sub{color:var(--muted);font-size:12px;margin-top:6px}
+.card.accent .card-value{color:var(--accent)}
+.card.green  .card-value{color:var(--green)}
+.card.blue   .card-value{color:var(--blue)}
+.card.red    .card-value{color:var(--red)}
+
+/* ── Grid sections ── */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+.section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.section h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section h2 span{font-size:16px}
+
+/* ── Metric rows ── */
+.metric-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.metric-row:last-child{border-bottom:none}
+.metric-name{color:var(--muted);font-size:13px}
+.metric-val{font-size:14px;font-weight:600}
+.metric-val.ok{color:var(--green)}
+.metric-val.warn{color:var(--accent)}
+.metric-val.err{color:var(--red)}
+
+/* ── Bar chart ── */
+canvas{width:100%!important;display:block;margin-top:12px}
+
+/* ── Sign distribution ── */
+.sign-bar{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+.sign-name{width:80px;color:var(--muted);text-align:right;flex-shrink:0}
+.sign-track{flex:1;background:var(--bg);border-radius:4px;height:16px;overflow:hidden}
+.sign-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .4s}
+.sign-count{width:30px;flex-shrink:0;color:var(--text);font-weight:600}
+
+/* ── Error log ── */
+.error-list{max-height:200px;overflow-y:auto}
+.error-item{padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.error-item:last-child{border-bottom:none}
+.error-ts{color:var(--muted);margin-right:8px}
+.error-src{color:var(--accent);margin-right:6px}
+.error-msg{color:var(--red)}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:20px}
+
+/* ── Status dot ── */
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.dot.ok{background:var(--green)}
+.dot.err{background:var(--red)}
+.dot.warn{background:var(--accent)}
+
+/* ── Loading ── */
+.loading{color:var(--muted);font-size:13px;text-align:center;padding:40px}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Note badge ── */
+.badge{background:rgba(201,168,76,.12);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid rgba(201,168,76,.25)}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>🔮 Shimal</h1>
+    <p>Admin Dashboard</p>
+    <input type="password" id="pwd-input" placeholder="Şifre" autofocus>
+    <button onclick="doLogin()">Giriş Yap</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="app">
+  <header>
+    <h1>🔮 Shimal Admin</h1>
+    <div class="header-right">
+      <span class="last-update" id="last-update">—</span>
+      <button class="refresh-btn" onclick="refresh(true)">↺ Yenile</button>
+      <button class="logout-btn" onclick="logout()">Çıkış</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="content"><div class="loading"><span class="spinner"></span>Yükleniyor...</div></div>
+  </main>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let token = localStorage.getItem('shimal_dash_token');
+let trendData = null;
+let refreshTimer = null;
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const pwd = document.getElementById('pwd-input').value;
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+  try {
+    const r = await fetch(`${BASE}/dashboard/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pwd }),
+    });
+    const d = await r.json();
+    if (!r.ok) { err.textContent = d.error || 'Hata'; return; }
+    token = d.token;
+    localStorage.setItem('shimal_dash_token', token);
+    showApp();
+  } catch(e) { err.textContent = 'Bağlantı hatası'; }
+}
+
+document.getElementById('pwd-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+function logout() {
+  localStorage.removeItem('shimal_dash_token');
+  token = null;
+  clearInterval(refreshTimer);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  refresh(true);
+  refreshTimer = setInterval(() => refresh(false), 2 * 60 * 1000);
+}
+
+// ── Fetch ─────────────────────────────────────────────────────────────────────
+async function apiFetch(path, force = false) {
+  const url = `${BASE}${path}${force ? '?force=1' : ''}`;
+  const r = await fetch(url, { headers: { 'x-dashboard-token': token } });
+  if (r.status === 401) { logout(); throw new Error('Oturum sona erdi'); }
+  return r.json();
+}
+
+async function refresh(force = false) {
+  try {
+    const [stats, trend] = await Promise.all([
+      apiFetch('/dashboard/stats', force),
+      apiFetch('/dashboard/stats/insights', false),
+    ]);
+    trendData = trend;
+    render(stats, trend);
+    document.getElementById('last-update').textContent =
+      'Son güncelleme: ' + new Date().toLocaleTimeString('tr-TR') + (stats.cached ? ' (önbellekten)' : '');
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('tr-TR'); }
+function fmtUsd(n) { return n == null ? '—' : '$' + Number(n).toFixed(2); }
+function fmtUptime(s) {
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
+        m = Math.floor((s % 3600) / 60);
+  return `${d}g ${h}s ${m}d`;
+}
+function dot(ok) { return `<span class="dot ${ok ? 'ok' : 'err'}"></span>`; }
+function ago(iso) {
+  if (!iso) return '—';
+  const diff = (Date.now() - new Date(iso)) / 1000;
+  if (diff < 60) return Math.floor(diff) + 'sn önce';
+  if (diff < 3600) return Math.floor(diff/60) + 'dk önce';
+  if (diff < 86400) return Math.floor(diff/3600) + 'sa önce';
+  return Math.floor(diff/86400) + 'g önce';
+}
+
+const SIGN_TR = {
+  Aries:'Koç',Taurus:'Boğa',Gemini:'İkizler',Cancer:'Yengeç',Leo:'Aslan',
+  Virgo:'Başak',Libra:'Terazi',Scorpio:'Akrep',Sagittarius:'Yay',
+  Capricorn:'Oğlak',Aquarius:'Kova',Pisces:'Balık'
+};
+function trSign(s) { return SIGN_TR[s] || s || 'Bilinmiyor'; }
+
+function render(stats, trend) {
+  const sb = stats.supabase  || {};
+  const an = stats.anthropic || {};
+  const os = stats.onesignal || {};
+  const sv = stats.server    || {};
+
+  const convRate = sb.totalUsers > 0
+    ? Math.round((sb.premiumUsers / sb.totalUsers) * 100) : 0;
+  const aiSuccessRate = sb.usersWithPush > 0 && sb.insightsToday > 0
+    ? Math.min(100, Math.round((sb.insightsToday / sb.usersWithPush) * 100)) : null;
+
+  // Sun sign bars
+  const signDist = sb.signDist || {};
+  const maxSign = Math.max(...Object.values(signDist), 1);
+  const signHTML = Object.entries(signDist)
+    .sort((a,b) => b[1]-a[1])
+    .map(([sign, cnt]) => `
+      <div class="sign-bar">
+        <div class="sign-name">${trSign(sign)}</div>
+        <div class="sign-track"><div class="sign-fill" style="width:${Math.round(cnt/maxSign*100)}%"></div></div>
+        <div class="sign-count">${cnt}</div>
+      </div>`).join('') || '<div class="empty">Veri yok</div>';
+
+  // Errors
+  const errHTML = (sv.recentErrors || []).length === 0
+    ? '<div class="empty">Hata yok ✓</div>'
+    : (sv.recentErrors || []).map(e =>
+        `<div class="error-item"><span class="error-ts">${e.ts.slice(11,19)}</span><span class="error-src">[${e.source}]</span><span class="error-msg">${e.message}</span></div>`
+      ).join('');
+
+  document.getElementById('content').innerHTML = `
+    <!-- Top cards -->
+    <div class="cards">
+      <div class="card accent">
+        <div class="card-label">Toplam Kullanıcı</div>
+        <div class="card-value">${fmt(sb.totalUsers)}</div>
+        <div class="card-sub">+${fmt(sb.newToday)} bugün · +${fmt(sb.newWeek)} bu hafta</div>
+      </div>
+      <div class="card green">
+        <div class="card-label">Premium</div>
+        <div class="card-value">${fmt(sb.premiumUsers)}</div>
+        <div class="card-sub">%${convRate} conversion</div>
+      </div>
+      <div class="card blue">
+        <div class="card-label">Push Token</div>
+        <div class="card-value">${fmt(sb.usersWithPush)}</div>
+        <div class="card-sub">${sb.totalUsers ? Math.round(sb.usersWithPush/sb.totalUsers*100) : 0}% kapsama</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Bugün Insight</div>
+        <div class="card-value">${fmt(sb.insightsToday)}</div>
+        <div class="card-sub">${aiSuccessRate != null ? 'AI başarı: %'+aiSuccessRate : 'Henüz yok'}</div>
+      </div>
+      <div class="card ${an.costUsd > 5 ? 'red' : 'green'}">
+        <div class="card-label">API Maliyeti</div>
+        <div class="card-value">${fmtUsd(an.costUsd)}</div>
+        <div class="card-sub">Bu ay ${an.source === 'estimate' ? '(tahmin)' : ''}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Uptime</div>
+        <div class="card-value" style="font-size:18px">${fmtUptime(sv.uptime || 0)}</div>
+        <div class="card-sub">${sv.env}</div>
+      </div>
+    </div>
+
+    <!-- Row 1: Insights + API -->
+    <div class="grid2">
+      <div class="section">
+        <h2><span>📅</span> Günlük Insightlar — 30 Gün</h2>
+        <canvas id="trend-chart" height="120"></canvas>
+      </div>
+      <div class="section">
+        <h2><span>🤖</span> Anthropic API Kullanımı
+          ${an.source === 'estimate' ? '<span class="badge">Tahmin</span>' : '<span class="badge" style="background:rgba(76,175,125,.12);color:var(--green);border-color:rgba(76,175,125,.25)">Gerçek</span>'}
+        </h2>
+        <div class="metric-row"><span class="metric-name">Bu ay maliyet</span><span class="metric-val ${(an.costUsd||0) > 10 ? 'err' : 'ok'}">${fmtUsd(an.costUsd)}</span></div>
+        <div class="metric-row"><span class="metric-name">Input token</span><span class="metric-val">${fmt(an.inputTokens)}</span></div>
+        <div class="metric-row"><span class="metric-name">Output token</span><span class="metric-val">${fmt(an.outputTokens)}</span></div>
+        <div class="metric-row"><span class="metric-name">İstek sayısı</span><span class="metric-val">${fmt(an.requests)}</span></div>
+        ${an.note ? `<div style="margin-top:10px;font-size:11px;color:var(--muted)">${an.note}</div>` : ''}
+        ${!an.ok ? `<div class="metric-row"><span class="metric-name">Hata</span><span class="metric-val err">${an.error}</span></div>` : ''}
+      </div>
+    </div>
+
+    <!-- Row 2: Push + Sistem -->
+    <div class="grid2">
+      <div class="section">
+        <h2><span>🔔</span> Push Bildirimleri (OneSignal)</h2>
+        <div class="metric-row"><span class="metric-name">Kayıtlı cihaz</span><span class="metric-val">${fmt(os.players)}</span></div>
+        <div class="metric-row"><span class="metric-name">Mesajlanabilir</span><span class="metric-val">${fmt(os.messagablePlayers)}</span></div>
+        <div class="metric-row"><span class="metric-name">Son 30 bildirim gönderim</span><span class="metric-val">${fmt(os.totalSentRecent)}</span></div>
+        <div class="metric-row"><span class="metric-name">Tıklama (CTR)</span><span class="metric-val ${(os.ctrPercent||0) > 40 ? 'ok' : 'warn'}">%${os.ctrPercent ?? '—'}</span></div>
+        <div class="metric-row"><span class="metric-name">Son bildirim</span><span class="metric-val">${ago(os.lastSentAt)}</span></div>
+        ${!os.ok ? `<div class="metric-row"><span class="metric-name">Hata</span><span class="metric-val err">${os.error}</span></div>` : ''}
+      </div>
+      <div class="section">
+        <h2><span>⚙️</span> Sistem Sağlığı</h2>
+        <div class="metric-row"><span class="metric-name">Backend</span><span class="metric-val ok">${dot(true)} Çalışıyor</span></div>
+        <div class="metric-row"><span class="metric-name">Veritabanı</span><span class="metric-val ${sb.ok ? 'ok' : 'err'}">${dot(sb.ok)} ${sb.ok ? 'Bağlı' : 'Hata'}</span></div>
+        <div class="metric-row"><span class="metric-name">Anthropic API</span><span class="metric-val ${an.ok ? 'ok' : 'err'}">${dot(an.ok)} ${an.ok ? 'Aktif' : 'Hata'}</span></div>
+        <div class="metric-row"><span class="metric-name">Uptime</span><span class="metric-val">${fmtUptime(sv.uptime || 0)}</span></div>
+        <div class="metric-row"><span class="metric-name">Node.js</span><span class="metric-val">${sv.nodeVersion}</span></div>
+      </div>
+    </div>
+
+    <!-- Row 3: Burç dağılımı + Hatalar -->
+    <div class="grid2">
+      <div class="section">
+        <h2><span>♈</span> Burç Dağılımı</h2>
+        ${signHTML}
+      </div>
+      <div class="section">
+        <h2><span>⚠️</span> Son Hatalar</h2>
+        <div class="error-list">${errHTML}</div>
+      </div>
+    </div>
+  `;
+
+  // Draw trend chart
+  drawChart(trend);
+}
+
+// ── Canvas bar chart ──────────────────────────────────────────────────────────
+function drawChart(trend) {
+  const canvas = document.getElementById('trend-chart');
+  if (!canvas || !trend || !trend.days) return;
+  const ctx = canvas.getContext('2d');
+  const days = trend.days;
+  const W = canvas.parentElement.clientWidth - 40;
+  const H = 120;
+  canvas.width  = W;
+  canvas.height = H;
+
+  const max = Math.max(...days.map(d => d.count), 1);
+  const barW = Math.floor((W - 20) / days.length) - 2;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = '#252a35';
+  ctx.lineWidth = 1;
+  [0.25, 0.5, 0.75, 1].forEach(f => {
+    const y = Math.floor(H - 20 - f * (H - 30));
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  });
+
+  // Bars
+  days.forEach((d, i) => {
+    const x = 10 + i * (barW + 2);
+    const h = Math.max(2, Math.round((d.count / max) * (H - 30)));
+    const y = H - 20 - h;
+    const isToday = d.date === new Date().toISOString().split('T')[0];
+    ctx.fillStyle = d.count === 0 ? '#252a35' : isToday ? '#c9a84c' : '#5b8dee';
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, h, 2);
+    ctx.fill();
+  });
+
+  // X labels — only show every 5th
+  ctx.fillStyle = '#7a8099';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'center';
+  days.forEach((d, i) => {
+    if (i % 5 === 0 || i === days.length - 1) {
+      const x = 10 + i * (barW + 2) + barW / 2;
+      ctx.fillText(d.date.slice(5), x, H - 4);
+    }
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+if (token) {
+  showApp();
+} // else login screen is already visible
+</script>
+</body>
+</html>

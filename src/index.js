@@ -146,7 +146,7 @@ async function routeRequest(req, res) {
   // API key check (skip public routes and cron endpoint which has its own auth)
   const isPublic = url.pathname === '/' || url.pathname === '/health';
   const isCron = url.pathname === '/api/daily/generate-all' || url.pathname === '/api/user/migrate-natal';
-  const isDashboard = url.pathname.startsWith('/dashboard/');
+  const isDashboard = url.pathname === '/dashboard' || url.pathname.startsWith('/dashboard/');
   const isDemo = url.pathname.startsWith('/api/demo/');
   if (!isPublic && !isCron && !isDemo && !isDashboard) {
     if (!checkApiKey(req, res)) return;
