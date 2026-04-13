@@ -27,6 +27,7 @@ class SupabaseQueryBuilder {
     this.limitValue = null;
     this.expectSingle = false;
     this.returnRepresentation = false;
+    this.onConflict = null;
   }
 
   select(columns = '*') {
@@ -44,6 +45,13 @@ class SupabaseQueryBuilder {
   insert(payload) {
     this.action = 'insert';
     this.payload = payload;
+    return this;
+  }
+
+  upsert(payload, options = {}) {
+    this.action = 'upsert';
+    this.payload = payload;
+    this.onConflict = options.onConflict || null;
     return this;
   }
 
@@ -117,11 +125,21 @@ class SupabaseQueryBuilder {
     if (this.returnRepresentation) {
       query.set('select', this.columns);
     }
+    if (this.action === 'upsert' && this.onConflict) {
+      query.set('on_conflict', this.onConflict);
+    }
     url.search = query.toString();
+
+    // Upsert = POST + Prefer: resolution=merge-duplicates
+    const preferParts = [];
+    if (this.action === 'upsert') {
+      preferParts.push('resolution=merge-duplicates');
+    }
+    preferParts.push(this.returnRepresentation ? 'return=representation' : 'return=minimal');
 
     const headers = buildHeaders({
       'Content-Type': 'application/json',
-      Prefer: this.returnRepresentation ? 'return=representation' : 'return=minimal',
+      Prefer: preferParts.join(','),
       Accept: this.expectSingle ? 'application/vnd.pgrst.object+json' : 'application/json',
     });
 
@@ -135,7 +153,7 @@ class SupabaseQueryBuilder {
       );
     }
 
-    const method = this.action === 'insert' ? 'POST' : 'PATCH';
+    const method = (this.action === 'insert' || this.action === 'upsert') ? 'POST' : 'PATCH';
     return parseSupabaseResponse(
       await fetch(url, {
         method,

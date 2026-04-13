@@ -381,13 +381,6 @@ function getRetrogradePlanets(date = new Date()) {
   return retrogrades;
 }
 
-function getEphemerisStatus() {
-  return {
-    mode: swisseph ? 'swisseph' : 'fallback',
-    loadError: swissEphemerisLoadError ? swissEphemerisLoadError.message : null,
-  };
-}
-
 module.exports = {
   dateToJulianDay,
   calcPlanetPosition,
@@ -395,8 +388,4 @@ module.exports = {
   calcNatalChart,
   calcCurrentTransits,
   getRetrogradePlanets,
-  getEphemerisStatus,
-  calcHouses,
-  assignPlanetToHouse,
-  calcPartOfFortune,
 };

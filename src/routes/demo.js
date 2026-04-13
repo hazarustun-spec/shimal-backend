@@ -81,63 +81,6 @@ async function handleDemoPushToken(req, res) {
   writeJson(res, 200, { success: true });
 }
 
-async function handleDemoDecision(req, res) {
-  try {
-    const body = await readJsonBody(req);
-    const { deviceId, category, question = '' } = body;
-    const user = demoUsers.get(deviceId);
-
-    if (!user) {
-      writeJson(res, 404, { error: 'User not found. Register first via POST /api/demo/user/register' });
-      return;
-    }
-    if (!category) {
-      return badRequest(res, 'category is required');
-    }
-
-    const transitData = calculateDailyTransits(user.natal_planets);
-    const topAspect = transitData.aspects[0];
-    const hasRetrogrades = transitData.retrogrades.length > 0;
-    const mercuryRetrograde = transitData.retrogrades.some((item) => item.planet === 'Mercury');
-
-    const status = topAspect?.nature === 'harmonious' && !mercuryRetrograde
-      ? 'favorable'
-      : (topAspect?.nature === 'challenging' || (mercuryRetrograde && category === 'communication'))
-        ? 'caution'
-        : 'neutral';
-
-    const categoryAdvice = {
-      love: 'Lead with sincerity rather than urgency. Emotional clarity will matter more than dramatic timing.',
-      career: 'Favor the move that strengthens your long-term position, even if it asks for patience today.',
-      money: 'Keep numbers and assumptions explicit. A grounded review will protect your confidence.',
-      communication: 'Choose precision over speed. The right phrasing matters more than saying everything at once.',
-      personal: 'Notice whether this choice expands your calm or only relieves short-term pressure.',
-    };
-
-    const explanation = topAspect
-      ? `${topAspect.planet1} ${topAspect.aspect} ${topAspect.planet2} is shaping the tone of the moment, so this decision carries a ${topAspect.nature === 'harmonious' ? 'more fluid and supportive' : 'more charged and demanding'} rhythm than usual.${hasRetrogrades ? ' Current retrogrades also suggest that timing benefits from reflection.' : ''}`
-      : 'The cosmic weather is relatively even right now, which makes this a moment for measured clarity rather than impulse.';
-
-    const bestApproachNow = status === 'favorable'
-      ? 'Move gently but decisively, and keep your intention simple.'
-      : status === 'caution'
-        ? 'Slow the pace, ask one more honest question, and let clarity settle before committing.'
-        : 'Stay open, gather the signal you still need, and avoid forcing certainty too early.';
-
-    writeJson(res, 200, {
-      category,
-      status,
-      headline: status === 'favorable' ? 'The moment is opening' : status === 'caution' ? 'A little more care' : 'Steady but mixed',
-      explanation,
-      practical_advice: `${categoryAdvice[category] || categoryAdvice.personal}${question ? ` Keep returning to the heart of your question: "${question}".` : ''}`,
-      best_approach_now: bestApproachNow,
-      generated_at: new Date().toISOString(),
-    });
-  } catch (error) {
-    internalError(res, error, '[Demo] Decision guidance error:', error.message || 'Demo decision failed');
-  }
-}
-
 function generateTemplateInsight(user, transitData, topAspects) {
   const today = new Date().toISOString().split('T')[0];
   const retrogrades = transitData.retrogrades;
@@ -216,5 +159,4 @@ module.exports = [
   ['POST', /^\/api\/demo\/user\/register$/, handleDemoUserRegister],
   ['GET', /^\/api\/demo\/daily\/([^/]+)$/, handleDemoDaily, ['deviceId']],
   ['PUT', /^\/api\/demo\/user\/push-token$/, handleDemoPushToken],
-  ['POST', /^\/api\/demo\/guidance\/decision$/, handleDemoDecision],
 ];

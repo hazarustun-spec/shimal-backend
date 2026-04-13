@@ -31,9 +31,9 @@ async function handleDecisionGuidance(req, res) {
     if (!deviceId || !isValidDeviceId(deviceId)) {
       return badRequest(res, 'Valid deviceId is required');
     }
-    if (!checkOwnership(req, res, deviceId)) return;
-    if (!category) {
-      return badRequest(res, 'category is required');
+    if (!(await checkOwnership(req, res, deviceId))) return;
+    if (!category || typeof category !== 'string' || category.length > 32) {
+      return badRequest(res, 'Geçersiz kategori');
     }
     if (question && !isValidText(question, 500)) {
       return badRequest(res, 'question must be under 500 characters');

@@ -45,6 +45,20 @@ function isValidText(v, maxLen = 500) {
   return typeof v === 'string' && v.length > 0 && v.length <= maxLen;
 }
 
+function isValidLatitude(v) {
+  return typeof v === 'number' && isFinite(v) && v >= -90 && v <= 90;
+}
+
+function isValidLongitude(v) {
+  return typeof v === 'number' && isFinite(v) && v >= -180 && v <= 180;
+}
+
+function isValidBirthPlace(v) {
+  // Opsiyonel alan: boş string kabul, dolu ise 200 char altında
+  if (v === undefined || v === null || v === '') return true;
+  return typeof v === 'string' && v.length <= 200;
+}
+
 /**
  * Sanitize a name/text field before sending to AI prompt.
  * Strips anything that looks like an instruction or injection attempt.
@@ -71,5 +85,8 @@ module.exports = {
   isValidEmail,
   isValidOtp,
   isValidText,
+  isValidLatitude,
+  isValidLongitude,
+  isValidBirthPlace,
   sanitizeForAI,
 };

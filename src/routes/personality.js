@@ -108,7 +108,7 @@ async function handleGetPersonality(req, res, params) {
     if (!isValidDeviceId(deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    if (!checkOwnership(req, res, deviceId)) return;
+    if (!(await checkOwnership(req, res, deviceId))) return;
 
     const { data: user, error } = await supabase
       .from('users')

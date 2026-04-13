@@ -134,4 +134,4 @@ function findNatalAspects(planets) {
   return aspects;
 }
 
-module.exports = { ASPECTS, angularDistance, findAspect, findAllAspects, findNatalAspects };
+module.exports = { findAspect, findAllAspects, findNatalAspects };

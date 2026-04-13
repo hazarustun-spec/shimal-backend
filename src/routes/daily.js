@@ -5,7 +5,7 @@ const { calculateDailyTransits } = require('../services/transit-calculator');
 const { generateDailyInsight, buildFallbackInsight } = require('../services/ai-interpreter');
 const { buildWhyTodayFeelsDifferent } = require('../services/cosmic-context');
 const { buildNatalChart } = require('../services/natal-chart');
-const { writeJson, internalError, badRequest, checkOwnership } = require('../utils/http');
+const { writeJson, internalError, badRequest, checkOwnership, checkCronKey } = require('../utils/http');
 const { isValidDeviceId } = require('../utils/validate');
 
 const { toTR } = require('../utils/zodiac-tr');
@@ -45,6 +45,59 @@ function getFreshNatalData(user) {
       natalPlanets: user.natal_planets || {},
       ascSign: user.natal_planets?._ascendant?.sign || null,
     };
+  }
+}
+
+// ─── Feedback summary (adaptive prompting) ────────────────────────────────────
+// Kullanıcının son 14 gündeki feedback'lerini çekip AI için özet döndürür.
+// AI bu özeti görerek kullanıcının hangi tür içerikleri "benimle ilgili değil"
+// bulduğunu öğrenir ve bir sonraki üretimde daha dikkatli olur.
+async function getFeedbackSummary(userId) {
+  try {
+    const sinceIso = new Date(Date.now() - 14 * 86400000).toISOString();
+    const { data, error } = await supabase
+      .from('feedback')
+      .select('content_type, is_positive, created_at')
+      .eq('user_id', userId)
+      .gte('created_at', sinceIso);
+
+    if (error || !Array.isArray(data) || data.length === 0) return null;
+
+    // Bölüm bazında pozitif/negatif say
+    const tallies = {}; // { content_type: { pos: n, neg: n } }
+    for (const row of data) {
+      const type = row.content_type || 'unknown';
+      if (!tallies[type]) tallies[type] = { pos: 0, neg: 0 };
+      if (row.is_positive) tallies[type].pos++;
+      else tallies[type].neg++;
+    }
+
+    // Türkçe etiket haritası
+    const labelMap = {
+      daily_focus:         'günlük odak',
+      personality_summary: 'kişilik özeti',
+      personality_planet:  'kişilik gezegen yorumu',
+      love:                'aşk bölümü',
+      career:              'kariyer bölümü',
+      energy:              'enerji bölümü',
+      health:              'sağlık bölümü',
+      money:               'para bölümü',
+    };
+
+    const negatives = [];
+    const positives = [];
+    for (const [type, counts] of Object.entries(tallies)) {
+      const label = labelMap[type] || type;
+      if (counts.neg > 0) negatives.push(`${label} (${counts.neg} kez "benimle ilgili değil")`);
+      if (counts.pos >= 2) positives.push(`${label} (${counts.pos} kez "benimle ilgili")`);
+    }
+
+    if (negatives.length === 0 && positives.length === 0) return null;
+
+    return { negatives, positives, totalCount: data.length };
+  } catch (err) {
+    console.warn('[Daily] Feedback summary hatası:', err.message || err);
+    return null;
   }
 }
 
@@ -96,24 +149,31 @@ async function getUserByDeviceId(deviceId) {
 function applyPremiumGate(response, isPremium) {
   if (isPremium) return { ...response, is_premium: true };
 
-  // Free users see the teaser (short) but detail is locked
-  const lockDetail = (section) => {
+  // Free users see first 2 paragraphs, 3rd paragraph is premium-only
+  const gateDetail = (section) => {
     if (!section) return section;
+    const detail = section.detail || '';
+    // AI paragrafları \n\n ile ayırıyor
+    const paragraphs = detail.split(/\n\n+/).filter(p => p.trim());
+    const freeDetail = paragraphs.length >= 2
+      ? paragraphs.slice(0, 2).join('\n\n')
+      : detail; // 2'den az paragraf varsa olduğu gibi göster
     return {
-      title: section.title,
-      short: section.short,
-      detail: 'Premium içgörü — devamını okumak için Premium\'a geç.',
+      ...section,
+      detail: freeDetail,
+      has_premium_content: paragraphs.length >= 3,
     };
   };
 
   return {
     ...response,
     is_premium: false,
-    love: lockDetail(response.love),
-    career: lockDetail(response.career),
-    energy: lockDetail(response.energy),
-    health: lockDetail(response.health),
-    money: lockDetail(response.money),
+    love: gateDetail(response.love),
+    career: gateDetail(response.career),
+    energy: gateDetail(response.energy),
+    health: gateDetail(response.health),
+    money: gateDetail(response.money),
+    daily_focus: gateDetail(response.daily_focus),
   };
 }
 
@@ -122,7 +182,7 @@ async function handleDailyGet(req, res, params, url) {
     if (!isValidDeviceId(params.deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    if (!checkOwnership(req, res, params.deviceId)) return;
+    if (!(await checkOwnership(req, res, params.deviceId))) return;
 
     const today = new Date().toISOString().split('T')[0];
     const user = await getUserByDeviceId(params.deviceId);
@@ -130,6 +190,15 @@ async function handleDailyGet(req, res, params, url) {
     if (!user) {
       writeJson(res, 404, { error: 'Kullanıcı bulunamadı. Lütfen önce kayıt olun.' });
       return;
+    }
+
+    // Timezone sessiz güncelleme — uygulama her açıldığında kendiliğinden düzelir
+    const clientTz = url.searchParams.get('tz');
+    if (clientTz && typeof clientTz === 'string' && clientTz.length < 60 && clientTz !== user.timezone) {
+      supabase.from('users').update({ timezone: clientTz }).eq('id', user.id)
+        .then(() => console.log(`[Daily] Timezone güncellendi: ${user.id} → ${clientTz}`))
+        .catch(() => {}); // non-blocking, hata durumunda sessiz geç
+      user.timezone = clientTz; // in-memory güncelle (bu istek için geçerli)
     }
 
     const { data: existing } = await supabase
@@ -172,6 +241,9 @@ async function handleDailyGet(req, res, params, url) {
       .eq('date', yesterday)
       .single();
 
+    // Son 14 gündeki feedback özeti — AI adaptive tuning için
+    const feedbackSummary = await getFeedbackSummary(user.id);
+
     let insight;
     try {
       insight = await generateDailyInsight({
@@ -184,7 +256,9 @@ async function handleDailyGet(req, res, params, url) {
         moonSign:           toTR(user.moon_sign),
         ascendantSign:      ascSign,
         preferredName:      url.searchParams.get('preferredName') || '',
+        birthPlace:         user.birth_place || null,
         yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
+        feedbackSummary,
       });
     } catch (aiError) {
       console.error(`[Daily] AI generation failed, using fallback. Error: ${aiError.message}\nStack: ${aiError.stack}`);
@@ -236,17 +310,40 @@ async function handleDailyGet(req, res, params, url) {
       generated: true,
     }, !!user.is_premium));
   } catch (error) {
-    internalError(res, error, '[Daily] Error:', 'Günlük içgörü oluşturulamadı');
+    // Outer catch — beklenmeyen hata. Kullanıcıyı 500 ile bırakmak yerine
+    // fallback içgörü dön (DB'ye kaydedilmez, bir sonraki istekte yeniden denenecek)
+    console.error('[Daily] Unexpected error, serving fallback:', error.message);
+    try {
+      const deviceId = params?.deviceId;
+      const { data: fallbackUser } = deviceId
+        ? await supabase.from('users').select('sun_sign, moon_sign, is_premium').eq('device_id', deviceId).maybeSingle()
+        : { data: null };
+      const fallback = buildFallbackInsight(fallbackUser?.sun_sign || 'Aries');
+      const today = new Date().toISOString().split('T')[0];
+      writeJson(res, 200, applyPremiumGate({
+        date: today,
+        sunSign: toTR(fallbackUser?.sun_sign || 'Aries'),
+        moonSign: toTR(fallbackUser?.moon_sign || 'Aries'),
+        love: fallback.love,
+        career: fallback.career,
+        energy: fallback.energy,
+        health: fallback.health || null,
+        money: fallback.money || null,
+        daily_focus: fallback.daily_focus,
+        notification_text: fallback.notification,
+        why_today_feels_different: null,
+        generated: false,
+        _fallback: true,
+      }, !!fallbackUser?.is_premium));
+    } catch (fallbackErr) {
+      internalError(res, error, '[Daily] Error (fallback also failed):', 'Günlük içgörü oluşturulamadı');
+    }
   }
 }
 
 async function handleDailyGenerateAll(req, res, _params, url) {
-  // Only accept cron key via header (never query param — appears in logs)
-  const apiKey = req.headers['x-cron-key'] || '';
-  if (!process.env.CRON_API_KEY || apiKey !== process.env.CRON_API_KEY) {
-    writeJson(res, 401, { error: 'Unauthorized' });
-    return;
-  }
+  // Timing-safe + per-IP brute-force lockout (5 hata → 30dk)
+  if (!checkCronKey(req, res)) return;
 
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -297,6 +394,7 @@ async function handleDailyGenerateAll(req, res, _params, url) {
           moonSign:           toTR(user.moon_sign),
           ascendantSign:      batchAscSign,
           preferredName:      user.preferred_name || '',
+          birthPlace:         user.birth_place || null,
           yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
         });
 
@@ -360,6 +458,9 @@ async function generateInsightForUser(user, today) {
     .eq('date', yesterday)
     .maybeSingle();
 
+  // Son 14 gündeki feedback özeti — AI adaptive tuning için
+  const feedbackSummary = await getFeedbackSummary(user.id);
+
   const insight = await generateDailyInsight({
     natalSummary:       natalLines.join('\n'),
     transitSummary:     transitData.summary,
@@ -370,7 +471,9 @@ async function generateInsightForUser(user, today) {
     moonSign:           toTR(user.moon_sign),
     ascendantSign:      freshAscSign,
     preferredName:      user.preferred_name || '',
+    birthPlace:         user.birth_place || null,
     yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
+    feedbackSummary,
   });
 
   await supabase.from('daily_insights').insert({
@@ -392,9 +495,113 @@ async function generateInsightForUser(user, today) {
   return insight.notification || 'Bugünkü kozmik rehberliğin hazır.';
 }
 
+// ─── Failed Insight Helpers ──────────────────────────────────────────────────
+
+/** Başarısız insight üretimini kaydet (upsert — aynı gün tekrar denenebilir) */
+async function recordFailedInsight(userId, date, errorMessage) {
+  try {
+    const { data: existing } = await supabase
+      .from('failed_insights')
+      .select('attempt_count')
+      .eq('user_id', userId)
+      .eq('date', date)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from('failed_insights')
+        .update({
+          attempt_count: (existing.attempt_count || 1) + 1,
+          last_error:    String(errorMessage || '').slice(0, 500),
+          updated_at:    new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+        .eq('date', date);
+    } else {
+      await supabase.from('failed_insights').insert({
+        user_id:       userId,
+        date,
+        attempt_count: 1,
+        last_error:    String(errorMessage || '').slice(0, 500),
+      });
+    }
+  } catch (err) {
+    console.warn('[FailedInsights] Could not record failure:', err.message);
+  }
+}
+
+/** Başarılı retry sonrası kaydı temizle */
+async function clearFailedInsight(userId, date) {
+  try {
+    await supabase
+      .from('failed_insights')
+      .delete()
+      .eq('user_id', userId)
+      .eq('date', date);
+  } catch (err) {
+    console.warn('[FailedInsights] Could not clear failure record:', err.message);
+  }
+}
+
+/**
+ * Bugün başarısız olan insight'ları yeniden dene.
+ * Maksimum 3 toplam deneme (attempt_count < 3 olan kayıtlar).
+ */
+async function retryFailedInsights(today) {
+  const { data: failedRecords, error } = await supabase
+    .from('failed_insights')
+    .select('user_id, attempt_count')
+    .eq('date', today)
+    .lt('attempt_count', 3); // 3. deneme dahil, 3'ten fazlasını atlıyoruz
+
+  if (error) throw error;
+  if (!failedRecords?.length) return { retried: 0, recovered: 0, stillFailing: 0 };
+
+  const userIds = failedRecords.map(f => f.user_id);
+  const { data: users } = await supabase.from('users').select('*').in('id', userIds);
+  if (!users?.length) return { retried: 0, recovered: 0, stillFailing: 0 };
+
+  // attempt_count'a hızlı erişim için map
+  const attemptMap = Object.fromEntries(failedRecords.map(f => [f.user_id, f.attempt_count]));
+
+  let recovered = 0, stillFailing = 0;
+  const BATCH = 3;
+  for (let i = 0; i < users.length; i += BATCH) {
+    const batch = users.slice(i, i + BATCH);
+    await Promise.allSettled(batch.map(async (user) => {
+      try {
+        const result = await generateInsightForUser(user, today);
+        if (result && result !== 'skipped') {
+          await clearFailedInsight(user.id, today);
+          recovered++;
+        }
+      } catch (err) {
+        stillFailing++;
+        const newCount = (attemptMap[user.id] || 1) + 1;
+        try {
+          await supabase
+            .from('failed_insights')
+            .update({
+              attempt_count: newCount,
+              last_error:    String(err.message || '').slice(0, 500),
+              updated_at:    new Date().toISOString(),
+            })
+            .eq('user_id', user.id)
+            .eq('date', today);
+        } catch (_) { /* ignore update error */ }
+      }
+    }));
+    if (i + BATCH < users.length) await new Promise(r => setTimeout(r, 500));
+  }
+
+  return { retried: users.length, recovered, stillFailing };
+}
+
 module.exports = [
   ['GET', /^\/api\/daily\/([^/]+)$/, handleDailyGet, ['deviceId']],
   ['POST', /^\/api\/daily\/generate-all$/, handleDailyGenerateAll],
 ];
 
 module.exports.generateInsightForUser = generateInsightForUser;
+module.exports.recordFailedInsight    = recordFailedInsight;
+module.exports.retryFailedInsights    = retryFailedInsights;

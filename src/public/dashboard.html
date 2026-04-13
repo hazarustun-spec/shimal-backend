@@ -16,7 +16,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 
 /* ── Login ── */
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 50% 0%,#1a1025 0%,var(--bg) 60%)}
-.login-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:44px 40px;width:350px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:44px 40px;width:90%;max-width:350px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.5)}
 .login-logo{font-size:42px;margin-bottom:12px}
 .login-box h1{font-size:24px;color:var(--accent);margin-bottom:4px;font-weight:700;letter-spacing:.3px}
 .login-box p{color:var(--muted);font-size:13px;margin-bottom:28px}
@@ -28,10 +28,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 
 /* ── App shell ── */
 #app{display:none}
-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(13,15,20,.95);backdrop-filter:blur(8px);z-index:10;height:54px}
-.header-left{display:flex;align-items:center;gap:18px}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(13,15,20,.95);backdrop-filter:blur(8px);z-index:10;min-height:54px;gap:10px;flex-wrap:wrap}
+@media(max-width:700px){header{padding:8px 12px;gap:6px}}
+.header-left{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+@media(max-width:700px){.header-left{flex-direction:column;align-items:flex-start;gap:6px}}
 .brand{font-size:17px;color:var(--accent);font-weight:700;letter-spacing:.3px;white-space:nowrap}
-.header-right{display:flex;align-items:center;gap:10px}
+.header-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .refresh-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:13px;transition:all .15s}
 .refresh-btn:hover{border-color:var(--accent);color:var(--text)}
 .last-update{color:var(--muted2);font-size:11px}
@@ -39,8 +41,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .logout-btn:hover{color:var(--red)}
 
 /* ── Tabs ── */
-.tabs{display:flex;gap:1px;background:var(--border2);border-radius:9px;padding:2px}
-.tab{padding:5px 14px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border:none;background:none;transition:all .15s;white-space:nowrap}
+.tabs{display:flex;gap:1px;background:var(--border2);border-radius:9px;padding:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;min-width:0}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:5px 14px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border:none;background:none;transition:all .15s;white-space:nowrap;flex-shrink:0}
+@media(max-width:700px){.tab{padding:5px 10px;font-size:12px}}
 .tab:hover{color:var(--text)}
 .tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.4)}
 
@@ -48,6 +52,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .tab-panel{display:none}
 .tab-panel.active{display:block}
 main{padding:20px 24px;max-width:1400px;margin:0 auto}
+@media(max-width:500px){main{padding:12px 10px}}
 
 /* ── Stat cards ── */
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:14px}
@@ -176,6 +181,45 @@ canvas{display:block;width:100%!important}
 
 /* ── Divider ── */
 .divider{height:1px;background:var(--border);margin:12px 0}
+
+/* ── Users table ── */
+.users-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.users-toolbar input{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;flex:1;min-width:140px;outline:none}
+.users-toolbar input:focus{border-color:var(--accent)}
+.users-toolbar select{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;cursor:pointer}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{text-align:left;padding:8px 10px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer}
+.tbl th:hover{color:var(--text)}
+.tbl td{padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl tr:hover td{background:rgba(201,168,76,.04)}
+.tbl .premium-badge{color:var(--accent);font-weight:600}
+.tbl .free-badge{color:var(--muted)}
+.pager{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px}
+.pager button{background:var(--card);border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+.pager button:disabled{opacity:.35;cursor:default}
+.pager span{color:var(--muted);font-size:12px}
+
+/* ── Cohort heatmap ── */
+.cohort-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.cohort-tbl th{padding:6px 8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.cohort-tbl td{padding:6px 8px;text-align:center;border-bottom:1px solid var(--border);font-weight:600}
+.cohort-tbl .week-label{text-align:left;color:var(--muted);font-weight:400}
+.cohort-tbl .size{color:var(--text);font-weight:400}
+
+/* ── Cron log ── */
+.cron-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+.cron-row:last-child{border-bottom:none}
+.cron-job{color:var(--accent);font-weight:600;width:90px;flex-shrink:0}
+.cron-status{width:60px;flex-shrink:0;font-weight:600}
+.cron-time{color:var(--muted);flex-shrink:0;width:120px}
+.cron-detail{color:var(--muted);flex:1}
+
+/* ── Revenue ── */
+.event-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.event-row:last-child{border-bottom:none}
+.event-type{font-weight:600;width:130px;flex-shrink:0}
+.event-amount{color:var(--green);font-weight:700;width:70px;text-align:right;flex-shrink:0}
+.event-time{color:var(--muted);flex-shrink:0}
 </style>
 </head>
 <body>
@@ -199,8 +243,11 @@ canvas{display:block;width:100%!important}
       <span class="brand">🔮 Shimal</span>
       <nav class="tabs">
         <button class="tab active" onclick="switchTab('overview',this)">Genel Bakış</button>
-        <button class="tab" onclick="switchTab('monetization',this)">Maliyet & Bildirimler</button>
+        <button class="tab" onclick="switchTab('revenue',this)">Gelir</button>
+        <button class="tab" onclick="switchTab('monetization',this)">Maliyet</button>
+        <button class="tab" onclick="switchTab('users',this)">Kullanıcılar</button>
         <button class="tab" onclick="switchTab('system',this)">Sistem</button>
+        <button class="tab" onclick="switchTab('feedback',this)">Geri Bildirim</button>
       </nav>
     </div>
     <div class="header-right">
@@ -221,7 +268,30 @@ let token = localStorage.getItem('shimal_dash_token');
 let currentTab = 'overview';
 let cachedStats = null;
 let cachedTrend = null;
+let cachedExtended = null;
 let refreshTimer = null;
+let usersPage = 1;
+let usersFilter = '';
+let usersSearch = '';
+
+// ─── Token expiry ────────────────────────────────────────────────────────────
+function isTokenExpired(t) {
+  if (!t) return true;
+  try {
+    const payload = t.split('.')[0];
+    const { exp } = JSON.parse(atob(payload.replace(/-/g,'+').replace(/_/g,'/')));
+    return !exp || Date.now() >= exp;
+  } catch { return true; }
+}
+
+// Periodic expiry check (every 60s)
+let expiryTimer = null;
+function startExpiryWatch() {
+  clearInterval(expiryTimer);
+  expiryTimer = setInterval(() => {
+    if (isTokenExpired(token)) logout();
+  }, 60 * 1000);
+}
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 async function doLogin() {
@@ -244,9 +314,12 @@ document.getElementById('pwd-input').addEventListener('keydown', e => { if (e.ke
 
 function logout() {
   localStorage.removeItem('shimal_dash_token');
-  token = null; clearInterval(refreshTimer);
+  token = null;
+  clearInterval(refreshTimer);
+  clearInterval(expiryTimer);
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('pwd-input').value = '';
 }
 
 function showApp() {
@@ -254,6 +327,7 @@ function showApp() {
   document.getElementById('app').style.display = 'block';
   refresh(true);
   refreshTimer = setInterval(() => refresh(false), 2 * 60 * 1000);
+  startExpiryWatch();
 }
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
@@ -264,8 +338,13 @@ function switchTab(name, el) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('tab-' + name);
   if (panel) panel.classList.add('active');
+  // Scroll to top on tab switch for clean view
+  window.scrollTo(0, 0);
   if (name === 'overview' && cachedTrend) {
     requestAnimationFrame(() => redrawCharts());
+  }
+  if (name === 'users') {
+    loadUsers();
   }
 }
 
@@ -279,14 +358,15 @@ async function apiFetch(path, force = false) {
 
 async function refresh(force = false) {
   try {
-    const [stats, trend] = await Promise.all([
+    const [stats, trend, extended] = await Promise.all([
       apiFetch('/dashboard/stats', force),
-      apiFetch('/dashboard/stats/insights', false),
+      apiFetch('/dashboard/stats/insights', force),
+      apiFetch('/dashboard/stats/extended', force),
     ]);
-    cachedStats = stats; cachedTrend = trend;
+    cachedStats = stats; cachedTrend = trend; cachedExtended = extended;
     renderAll(stats, trend);
     document.getElementById('last-update').textContent =
-      new Date().toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit' });
+      new Date().toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' });
   } catch(e) { console.error(e); }
 }
 
@@ -312,6 +392,7 @@ const SIGN_TR = {Aries:'Koç',Taurus:'Boğa',Gemini:'İkizler',Cancer:'Yengeç',
   Capricorn:'Oğlak',Aquarius:'Kova',Pisces:'Balık'};
 const trSign = s => SIGN_TR[s] || s || '?';
 function dot(ok) { return `<span class="dot ${ok?'ok':'err'}"></span>`; }
+function esc(s) { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 
 // Delta badge helpers
 function deltaUp(val, suffix='') {
@@ -321,241 +402,150 @@ function deltaNeutral(val, suffix='') {
   return `<span class="card-delta nt">${val}${suffix}</span>`;
 }
 
-// ─── Main render ──────────────────────────────────────────────────────────────
-function renderAll(stats, trend) {
+// ─── Shared computed values ───────────────────────────────────────────────────
+let _c = {}; // computed cache refreshed each renderAll
+
+function computeShared(stats) {
   const sb = stats.supabase  || {};
   const an = stats.anthropic || {};
   const os = stats.onesignal || {};
+  const fb = stats.feedback  || {};
   const sv = stats.server    || {};
+  const hl = stats.health    || { memory:{heapUsedMb:0,heapTotalMb:0,rssMb:0,heapPct:0,status:'ok'}, cpu:{pct:0,status:'ok'}, db:{ok:false,latencyMs:null,status:'error'}, anthropic:{ok:false,latencyMs:null} };
+  const empty = !sb.totalUsers;
 
-  const pushRate          = pct(sb.usersWithPush, sb.totalUsers);
-  const convRate          = pct(sb.premiumUsers, sb.totalUsers);
-  const eng7Rate          = pct(sb.activeUsers7d, sb.totalUsers);
-  const eng30Rate         = pct(sb.activeUsers30d, sb.totalUsers);
-  const activationRate    = pct(sb.newUsersActivated, sb.newWeek);
-  const costPerUser       = sb.activeUsers30d > 0 ? (an.costUsd||0) / sb.activeUsers30d : null;
-  const costPerInsight    = sb.insightsThisMonth > 0 ? (an.costUsd||0) / sb.insightsThisMonth : null;
+  const ext = cachedExtended || {};
+  const rv = ext.revenue || {};
+  const cr = ext.cron    || {};
+  const co = ext.cohort  || {};
 
-  // ─── Sign bars ──────────────────────────────────────────────────────────────
-  const signDist = sb.signDist || {};
-  const maxSign  = Math.max(...Object.values(signDist), 1);
-  const signHTML = Object.entries(signDist).sort((a,b)=>b[1]-a[1]).map(([s,c])=>`
-    <div class="sign-bar">
-      <div class="sign-name">${trSign(s)}</div>
-      <div class="sign-track"><div class="sign-fill" style="width:${Math.round(c/maxSign*100)}%"></div></div>
-      <div class="sign-count">${c}</div>
-    </div>`).join('') || '<div class="empty">Veri yok</div>';
+  _c = { sb, an, os, fb, sv, hl, empty, rv, cr, co,
+    pushRate:       pct(sb.usersWithPush, sb.totalUsers),
+    convRate:       pct(sb.premiumUsers, sb.totalUsers),
+    eng7Rate:       pct(sb.activeUsers7d, sb.totalUsers),
+    eng30Rate:      pct(sb.activeUsers30d, sb.totalUsers),
+    activationRate: pct(sb.newUsersActivated, sb.newWeek),
+    costPerUser:    sb.activeUsers30d > 0 ? (an.costUsd||0) / sb.activeUsers30d : null,
+    costPerInsight: sb.insightsThisMonth > 0 ? (an.costUsd||0) / sb.insightsThisMonth : null,
+    profit:         rv.ok ? (rv.monthRevenue||0) - (an.costUsd||0) : null,
+  };
+}
 
-  // ─── Error log ──────────────────────────────────────────────────────────────
-  const errHTML = !(sv.recentErrors||[]).length
-    ? '<div class="empty">✓ Hata yok</div>'
-    : sv.recentErrors.map(e =>
-        `<div class="error-item"><span class="error-ts">${e.ts.slice(11,19)}</span><span class="error-src">[${e.source}]</span><span class="error-msg">${e.message}</span></div>`
-      ).join('');
+// ─── Empty state helper ──────────────────────────────────────────────────────
+function emptyState(msg) {
+  return `<div class="empty">${esc(msg)}</div>`;
+}
 
-  // ─── Funnel ─────────────────────────────────────────────────────────────────
+// ─── Engagement ring (handles 0 gracefully) ──────────────────────────────────
+function ring(val, color, title, sub) {
+  const v = isNaN(val) ? 0 : val;
+  const r = 28, circ = 2*Math.PI*r, dash = circ*(v/100);
+  const strokeAttr = v === 0
+    ? `stroke="var(--border)" stroke-width="6" stroke-dasharray="4 4"`
+    : `stroke="${color}" stroke-width="6" stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"`;
+  return `
+    <div class="eng-item">
+      <div class="eng-ring">
+        <svg width="72" height="72" viewBox="0 0 72 72">
+          <circle cx="36" cy="36" r="${r}" fill="none" stroke="var(--border)" stroke-width="6"/>
+          <circle cx="36" cy="36" r="${r}" fill="none" ${strokeAttr}/>
+        </svg>
+        <div class="eng-ring-label">${v}<small>%</small></div>
+      </div>
+      <div class="eng-title">${esc(title)}</div>
+      <div class="eng-sub">${esc(sub)}</div>
+    </div>`;
+}
+
+// ─── Per-tab renderers ───────────────────────────────────────────────────────
+
+function renderOverview() {
+  const { sb, eng7Rate, eng30Rate, pushRate, convRate, activationRate, empty } = _c;
+
+  if (empty) return `<div class="tab-panel active" id="tab-overview">${emptyState('Henüz kullanıcı yok. Veriler burada görünecek.')}</div>`;
+
+  // Funnel
   const fSteps = [
-    { label: 'Kayıt Oldu',  n: sb.totalUsers,     color: '#5b8dee' },
+    { label: 'Kayıt Oldu',  n: sb.totalUsers,    color: '#5b8dee' },
     { label: 'Push İzni',   n: sb.usersWithPush,  color: '#9b7fe8' },
     { label: 'Aktif (30g)', n: sb.activeUsers30d, color: '#c9a84c' },
     { label: 'Premium',     n: sb.premiumUsers,   color: '#4caf7d' },
   ];
   const funnelHTML = fSteps.map((step, i) => {
-    const p    = pct(step.n, sb.totalUsers);
-    const barW = Math.max(1, p);
-    const drop = i < fSteps.length - 1 && fSteps[i].n > 0
+    const p = pct(step.n, sb.totalUsers), barW = Math.max(1, p);
+    const drop = i < fSteps.length-1 && fSteps[i].n > 0
       ? `<div class="funnel-drop">↓ ${pct(fSteps[i+1].n, fSteps[i].n)}% devam etti</div>` : '';
-    return `
-      <div class="funnel-step">
-        <div class="funnel-label">${step.label}</div>
-        <div class="funnel-track">
-          <div class="funnel-fill" style="width:${barW}%;background:${step.color}">${p > 14 ? '%'+p : ''}</div>
-        </div>
-        <div class="funnel-meta">
-          <span class="funnel-count">${fmt(step.n)}</span>
-          <span class="funnel-pct">%${p}</span>
-        </div>
+    return `<div class="funnel-step">
+        <div class="funnel-label">${esc(step.label)}</div>
+        <div class="funnel-track"><div class="funnel-fill" style="width:${barW}%;background:${step.color}">${p>14?'%'+p:''}</div></div>
+        <div class="funnel-meta"><span class="funnel-count">${fmt(step.n)}</span><span class="funnel-pct">%${p}</span></div>
       </div>${drop}`;
   }).join('');
 
-  // ─── Engagement rings ────────────────────────────────────────────────────────
-  function ring(val, color, title, sub) {
-    const r = 28, circ = 2*Math.PI*r, dash = circ*(val/100);
-    return `
-      <div class="eng-item">
-        <div class="eng-ring">
-          <svg width="72" height="72" viewBox="0 0 72 72">
-            <circle cx="36" cy="36" r="${r}" fill="none" stroke="var(--border)" stroke-width="6"/>
-            <circle cx="36" cy="36" r="${r}" fill="none" stroke="${color}" stroke-width="6"
-              stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"/>
-          </svg>
-          <div class="eng-ring-label">${val}<small>%</small></div>
-        </div>
-        <div class="eng-title">${title}</div>
-        <div class="eng-sub">${sub}</div>
-      </div>`;
-  }
-
-  // ─── Hour bars ───────────────────────────────────────────────────────────────
+  // Hour bars
   const hourDist = sb.refreshHourDist || {};
-  const hourMax  = Math.max(...Object.values(hourDist), 1);
+  const hourMax = Math.max(...Object.values(hourDist), 1);
   const hourHTML = `<div class="hour-chart">${Array.from({length:24},(_,h)=>{
-    const c = hourDist[h]||0;
-    const ht = Math.round(c/hourMax*46)+2;
-    return `<div class="hour-bar-wrap">
-      <div class="hour-bar" style="height:${ht}px;opacity:${c?0.85:0.15}"></div>
-      <div class="hour-lbl">${h%6===0?h:''}</div>
-    </div>`;
+    const c = hourDist[h]||0, ht = Math.round(c/hourMax*46)+2;
+    return `<div class="hour-bar-wrap"><div class="hour-bar" style="height:${ht}px;opacity:${c?0.85:0.15}"></div><div class="hour-lbl">${h%6===0?h:''}</div></div>`;
   }).join('')}</div>`;
 
-  // ─── Tracking cards ──────────────────────────────────────────────────────────
+  // Tracking cards
   const churnColor   = (sb.churnRisk||0) > sb.totalUsers*0.5 ? '#e05c5c' : '#e8924a';
   const successColor = (sb.insightSuccessRate||0) >= 80 ? '#4caf7d' : (sb.insightSuccessRate||0) >= 50 ? '#c9a84c' : '#e05c5c';
   const actColor     = activationRate >= 60 ? '#4caf7d' : activationRate >= 30 ? '#c9a84c' : '#e05c5c';
 
-  const trackingHTML = `
-    <div class="tracking-row">
-      <div class="track-card">
-        <div class="track-icon orange">😴</div>
-        <div class="track-body">
-          <div class="track-label">Churn Riski</div>
-          <div class="track-val" style="color:${churnColor}">${fmt(sb.churnRisk)}</div>
-          <div class="track-sub">30g içinde insight almadı</div>
-        </div>
-      </div>
-      <div class="track-card">
-        <div class="track-icon green">🎯</div>
-        <div class="track-body">
-          <div class="track-label">AI Başarı Oranı</div>
-          <div class="track-val" style="color:${successColor}">%${sb.insightSuccessRate ?? '—'}</div>
-          <div class="track-sub">Bu ay push'lı kullanıcılara</div>
-        </div>
-      </div>
-      <div class="track-card">
-        <div class="track-icon purple">🚀</div>
-        <div class="track-body">
-          <div class="track-label">Yeni Kullanıcı Aktivasyon</div>
-          <div class="track-val" style="color:${actColor}">${fmt(sb.newUsersActivated)}/${fmt(sb.newWeek)}</div>
-          <div class="track-sub">Bu hafta kayıt → insight %${activationRate}</div>
-        </div>
-      </div>
-    </div>`;
-
-  // ─── Build HTML ──────────────────────────────────────────────────────────────
-  document.getElementById('content').innerHTML = `
-
-  <!-- ══ GENEL BAKIŞ ══════════════════════════════════════════════════════ -->
-  <div class="tab-panel ${currentTab==='overview'?'active':''}" id="tab-overview">
-
+  return `<div class="tab-panel active" id="tab-overview">
     <div class="cards">
-      <div class="card c-accent">
-        <div class="card-label">Toplam Kullanıcı</div>
-        <div class="card-value">${fmt(sb.totalUsers)}</div>
-        <div class="card-sub">Bu hafta ${deltaUp(sb.newWeek)}</div>
-        <div class="card-sub" style="margin-top:2px">Bugün +${fmt(sb.newToday)}</div>
-      </div>
-      <div class="card c-blue">
-        <div class="card-label">7g Aktif</div>
-        <div class="card-value">${fmt(sb.activeUsers7d)}</div>
-        <div class="card-sub">%${eng7Rate} oran</div>
-      </div>
-      <div class="card c-purple">
-        <div class="card-label">30g Aktif</div>
-        <div class="card-value">${fmt(sb.activeUsers30d)}</div>
-        <div class="card-sub">%${eng30Rate} oran</div>
-      </div>
-      <div class="card c-green">
-        <div class="card-label">Premium</div>
-        <div class="card-value">${fmt(sb.premiumUsers)}</div>
-        <div class="card-sub">%${convRate} dönüşüm</div>
-      </div>
-      <div class="card">
-        <div class="card-label">Bugün Insight</div>
-        <div class="card-value">${fmt(sb.insightsToday)}</div>
-        <div class="card-sub">Bu ay: ${fmt(sb.insightsThisMonth)}</div>
-      </div>
-      <div class="card">
-        <div class="card-label">Push Kapsama</div>
-        <div class="card-value" style="font-size:22px">%${pushRate}</div>
-        <div class="card-sub">${fmt(sb.usersWithPush)} cihaz</div>
-      </div>
+      <div class="card c-accent"><div class="card-label">Toplam Kullanıcı</div><div class="card-value">${fmt(sb.totalUsers)}</div><div class="card-sub">Bu hafta ${deltaUp(sb.newWeek)}</div><div class="card-sub" style="margin-top:2px">Bugün +${fmt(sb.newToday)}</div></div>
+      <div class="card c-blue"><div class="card-label">7g Aktif</div><div class="card-value">${fmt(sb.activeUsers7d)}</div><div class="card-sub">%${eng7Rate} oran</div></div>
+      <div class="card c-purple"><div class="card-label">30g Aktif</div><div class="card-value">${fmt(sb.activeUsers30d)}</div><div class="card-sub">%${eng30Rate} oran</div></div>
+      <div class="card c-green"><div class="card-label">Premium</div><div class="card-value">${fmt(sb.premiumUsers)}</div><div class="card-sub">%${convRate} dönüşüm</div></div>
+      <div class="card"><div class="card-label">Bugün Insight</div><div class="card-value">${fmt(sb.insightsToday)}</div><div class="card-sub">Bu ay: ${fmt(sb.insightsThisMonth)}</div></div>
+      <div class="card"><div class="card-label">Push Kapsama</div><div class="card-value" style="font-size:22px">%${pushRate}</div><div class="card-sub">${fmt(sb.usersWithPush)} cihaz</div></div>
     </div>
-
-    ${trackingHTML}
-
+    <div class="tracking-row">
+      <div class="track-card"><div class="track-icon orange">😴</div><div class="track-body"><div class="track-label">Churn Riski</div><div class="track-val" style="color:${churnColor}">${fmt(sb.churnRisk)}</div><div class="track-sub">30g içinde insight almadı</div></div></div>
+      <div class="track-card"><div class="track-icon green">🎯</div><div class="track-body"><div class="track-label">AI Başarı Oranı</div><div class="track-val" style="color:${successColor}">%${sb.insightSuccessRate ?? '—'}</div><div class="track-sub">Bu ay push'lı kullanıcılara</div></div></div>
+      <div class="track-card"><div class="track-icon purple">🚀</div><div class="track-body"><div class="track-label">Yeni Kullanıcı Aktivasyon</div><div class="track-val" style="color:${actColor}">${fmt(sb.newUsersActivated)}/${fmt(sb.newWeek)}</div><div class="track-sub">Bu hafta kayıt → insight %${activationRate}</div></div></div>
+    </div>
     <div class="grid2">
-      <div class="section">
-        <h2><span class="ico">🔽</span> Dönüşüm Hunisi</h2>
-        <div class="funnel">${funnelHTML}</div>
-      </div>
-      <div class="section">
-        <h2><span class="ico">⚡</span> Engagement</h2>
-        <div class="eng-grid">
-          ${ring(eng7Rate, '#5b8dee', '7 Günlük', `${fmt(sb.activeUsers7d)} kullanıcı`)}
-          ${ring(eng30Rate, '#9b7fe8', '30 Günlük', `${fmt(sb.activeUsers30d)} kullanıcı`)}
-        </div>
-        <div class="divider"></div>
-        <h2 style="margin-top:4px"><span class="ico">🕐</span> Tercih Edilen Saat</h2>
-        ${hourHTML}
+      <div class="section"><h2><span class="ico">🔽</span> Dönüşüm Hunisi</h2><div class="funnel">${funnelHTML}</div></div>
+      <div class="section"><h2><span class="ico">⚡</span> Engagement</h2>
+        <div class="eng-grid">${ring(eng7Rate,'#5b8dee','7 Günlük',fmt(sb.activeUsers7d)+' kullanıcı')}${ring(eng30Rate,'#9b7fe8','30 Günlük',fmt(sb.activeUsers30d)+' kullanıcı')}</div>
+        <div class="divider"></div><h2 style="margin-top:4px"><span class="ico">🕐</span> Tercih Edilen Saat</h2>${hourHTML}
       </div>
     </div>
-
     <div class="grid2">
-      <div class="section">
-        <h2><span class="ico">📈</span> Kullanıcı Büyümesi — 30 Gün</h2>
-        <div class="chart-wrap">
-          <canvas id="growth-chart" height="100"></canvas>
-          <div class="chart-tooltip" id="tt-growth"></div>
-        </div>
-      </div>
-      <div class="section">
-        <h2><span class="ico">📅</span> Günlük Insightlar — 30 Gün</h2>
-        <div class="chart-wrap">
-          <canvas id="insight-chart" height="100"></canvas>
-          <div class="chart-tooltip" id="tt-insight"></div>
-        </div>
-      </div>
+      <div class="section"><h2><span class="ico">📈</span> Kullanıcı Büyümesi — 30 Gün</h2><div class="chart-wrap"><canvas id="growth-chart" height="100"></canvas><div class="chart-tooltip" id="tt-growth"></div></div></div>
+      <div class="section"><h2><span class="ico">📅</span> Günlük Insightlar — 30 Gün</h2><div class="chart-wrap"><canvas id="insight-chart" height="100"></canvas><div class="chart-tooltip" id="tt-insight"></div></div></div>
     </div>
+    ${renderCohortSection()}
+  </div>`;
+}
 
-  </div>
-
-  <!-- ══ MALİYET & BİLDİRİMLER ════════════════════════════════════════════ -->
-  <div class="tab-panel ${currentTab==='monetization'?'active':''}" id="tab-monetization">
-
+function renderMonetization() {
+  const { sb, an, os, costPerUser, costPerInsight } = _c;
+  return `<div class="tab-panel" id="tab-monetization">
     <div class="cost-grid">
-      <div class="cost-card">
-        <div class="lbl">Bu Ay Toplam</div>
-        <div class="val ${(an.costUsd||0)>10?'err':'ok'}">${fmtU(an.costUsd)}</div>
-        <div class="sub">${an.source==='estimate'?'Tahmin':'Gerçek'}</div>
-      </div>
-      <div class="cost-card">
-        <div class="lbl">Aktif Kullanıcı Başına</div>
-        <div class="val">${costPerUser!=null?fmtU3(costPerUser):'—'}</div>
-        <div class="sub">30g aktif / ay</div>
-      </div>
-      <div class="cost-card">
-        <div class="lbl">Insight Başına</div>
-        <div class="val">${costPerInsight!=null?fmtU3(costPerInsight):'—'}</div>
-        <div class="sub">${fmt(sb.insightsThisMonth)} insight</div>
-      </div>
-      <div class="cost-card">
-        <div class="lbl">AI İstekleri</div>
-        <div class="val" style="color:var(--blue)">${fmt(an.requests)}</div>
-        <div class="sub">Bu ay</div>
-      </div>
+      <div class="cost-card"><div class="lbl">Bu Ay Toplam</div><div class="val ${(an.costUsd||0)>10?'err':'ok'}">${fmtU(an.costUsd)}</div><div class="sub">Tahmin (DB)</div></div>
+      <div class="cost-card"><div class="lbl">Aktif Kullanıcı Başına</div><div class="val">${costPerUser!=null?fmtU3(costPerUser):'—'}</div><div class="sub">30g aktif / ay</div></div>
+      <div class="cost-card"><div class="lbl">Insight Başına</div><div class="val">${costPerInsight!=null?fmtU3(costPerInsight):'—'}</div><div class="sub">${fmt(sb.insightsThisMonth)} insight</div></div>
+      <div class="cost-card"><div class="lbl">AI İstekleri</div><div class="val" style="color:var(--blue)">${fmt(an.requests)}</div><div class="sub">Bu ay</div></div>
     </div>
-
     <div class="grid2">
       <div class="section">
-        <h2><span class="ico">🤖</span> Anthropic API
-          <span class="badge ${an.source==='estimate'?'amber':'green'}">${an.source==='estimate'?'Tahmin':'Gerçek'}</span>
-        </h2>
+        <h2><span class="ico">🤖</span> Anthropic API <span class="badge amber">Tahmin</span></h2>
         <div class="metric-row"><span class="metric-name">Bu ay maliyet</span><span class="metric-val ${(an.costUsd||0)>10?'err':'ok'}">${fmtU(an.costUsd)}</span></div>
+        <div class="metric-row"><span class="metric-name">Model</span><span class="metric-val">${esc(an.model||'—')}</span></div>
         <div class="metric-row"><span class="metric-name">Input token</span><span class="metric-val">${fmt(an.inputTokens)}</span></div>
         <div class="metric-row"><span class="metric-name">Output token</span><span class="metric-val">${fmt(an.outputTokens)}</span></div>
         <div class="metric-row"><span class="metric-name">Toplam istek</span><span class="metric-val">${fmt(an.requests)}</span></div>
-        <div class="metric-row"><span class="metric-name">Bu ay insight</span><span class="metric-val">${fmt(sb.insightsThisMonth)}</span></div>
-        ${!an.ok?`<div class="metric-row"><span class="metric-name">Hata</span><span class="metric-val err">${an.error}</span></div>`:''}
+        ${an.breakdown?`<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px">
+          <div class="metric-row"><span class="metric-name">Günlük insight</span><span class="metric-val">${fmt(an.breakdown.daily?.count)} → ${fmtU(an.breakdown.daily?.costUsd)}</span></div>
+          <div class="metric-row"><span class="metric-name">Kişilik analizi</span><span class="metric-val">${fmt(an.breakdown.personality?.count)} → ${fmtU(an.breakdown.personality?.costUsd)}</span></div>
+        </div>`:''}
+        ${!an.ok?`<div class="metric-row"><span class="metric-name">Hata</span><span class="metric-val err">${esc(an.error||'')}</span></div>`:''}
       </div>
       <div class="section">
         <h2><span class="ico">🔔</span> Push Bildirimleri (OneSignal)</h2>
@@ -563,43 +553,322 @@ function renderAll(stats, trend) {
         <div class="metric-row"><span class="metric-name">Mesajlanabilir</span><span class="metric-val">${fmt(os.messagablePlayers)}</span></div>
         <div class="metric-row"><span class="metric-name">Son 30 bildirim gönderim</span><span class="metric-val">${fmt(os.totalSentRecent)}</span></div>
         <div class="metric-row"><span class="metric-name">Tıklama oranı (CTR)</span><span class="metric-val ${(os.ctrPercent||0)>40?'ok':'warn'}">%${os.ctrPercent??'—'}</span></div>
-        <div class="metric-row"><span class="metric-name">Son bildirim</span><span class="metric-val">${ago(os.lastSentAt)}</span></div>
-        ${!os.ok?`<div class="metric-row"><span class="metric-name">Hata</span><span class="metric-val err">${os.error||'Bağlanamadı'}</span></div>`:''}
+        <div class="metric-row"><span class="metric-name">Son bildirim</span><span class="metric-val">${esc(ago(os.lastSentAt))}</span></div>
+        ${!os.ok?`<div class="metric-row"><span class="metric-name">Hata</span><span class="metric-val err">${esc(os.error||'Bağlanamadı')}</span></div>`:''}
       </div>
     </div>
+  </div>`;
+}
 
-  </div>
+function renderSystem() {
+  const { sb, os, sv, hl } = _c;
 
-  <!-- ══ SİSTEM ════════════════════════════════════════════════════════════ -->
-  <div class="tab-panel ${currentTab==='system'?'active':''}" id="tab-system">
+  // Sign bars (XSS-safe)
+  const signDist = sb.signDist || {};
+  const signEntries = Object.entries(signDist).sort((a,b)=>b[1]-a[1]);
+  const maxSign = Math.max(...Object.values(signDist), 1);
+  const signHTML = signEntries.length === 0
+    ? emptyState('Burç verisi yok')
+    : signEntries.map(([s,c])=>`<div class="sign-bar"><div class="sign-name">${esc(trSign(s))}</div><div class="sign-track"><div class="sign-fill" style="width:${Math.round(c/maxSign*100)}%"></div></div><div class="sign-count">${c}</div></div>`).join('');
 
+  // Error log (XSS-safe)
+  const errors = sv.recentErrors || [];
+  const errHTML = errors.length === 0
+    ? '<div class="empty">✓ Hata yok</div>'
+    : errors.map(e => `<div class="error-item"><span class="error-ts">${esc((e.ts||'').slice(11,19))}</span><span class="error-src">[${esc(e.source||'')}]</span><span class="error-msg">${esc(e.message||'')}</span></div>`).join('');
+
+  return `<div class="tab-panel" id="tab-system">
+    <div class="cards" style="margin-bottom:14px">
+      <div class="card ${hl.memory.status==='ok'?'c-green':hl.memory.status==='warning'?'c-orange':'c-red'}"><div class="card-label">Bellek (Heap)</div><div class="card-value" style="font-size:22px">%${hl.memory.heapPct}</div><div class="card-sub">${hl.memory.heapUsedMb}MB / ${hl.memory.heapTotalMb}MB</div><div class="card-sub">RSS: ${hl.memory.rssMb}MB</div></div>
+      <div class="card ${hl.cpu.status==='ok'?'c-green':hl.cpu.status==='warning'?'c-orange':'c-red'}"><div class="card-label">CPU</div><div class="card-value" style="font-size:22px">%${hl.cpu.pct}</div><div class="card-sub">${hl.cpu.status==='ok'?'Normal':hl.cpu.status==='warning'?'Yüksek':'Kritik'}</div></div>
+      <div class="card ${hl.db.status==='ok'?'c-green':hl.db.status==='warning'?'c-orange':'c-red'}"><div class="card-label">DB Latency</div><div class="card-value" style="font-size:22px">${hl.db.latencyMs!=null?hl.db.latencyMs+'ms':'—'}</div><div class="card-sub">${hl.db.ok?'Bağlı':'Bağlantı hatası'}</div></div>
+      <div class="card ${hl.anthropic.ok?'c-green':'c-red'}"><div class="card-label">Anthropic API</div><div class="card-value" style="font-size:22px">${hl.anthropic.latencyMs!=null?hl.anthropic.latencyMs+'ms':'—'}</div><div class="card-sub">${hl.anthropic.ok?'Erişilebilir':'Erişilemiyor'}</div></div>
+    </div>
     <div class="grid2">
       <div class="section">
-        <h2><span class="ico">⚙️</span> Sistem Sağlığı</h2>
-        <div class="metric-row"><span class="metric-name">Backend</span><span class="metric-val ok">${dot(true)}Çalışıyor</span></div>
-        <div class="metric-row"><span class="metric-name">Veritabanı</span><span class="metric-val ${sb.ok?'ok':'err'}">${dot(sb.ok)}${sb.ok?'Bağlı':'Hata'}</span></div>
-        <div class="metric-row"><span class="metric-name">Anthropic API</span><span class="metric-val ${an.ok?'ok':'err'}">${dot(an.ok)}${an.ok?'Aktif':'Hata'}</span></div>
+        <h2><span class="ico">⚙️</span> Sistem Durumu</h2>
+        <div class="metric-row"><span class="metric-name">Backend</span><span class="metric-val ${hl.db.ok&&hl.memory.status!=='critical'?'ok':'err'}">${dot(hl.db.ok&&hl.memory.status!=='critical')}${hl.db.ok&&hl.memory.status!=='critical'?'Sağlıklı':'Sorunlu'}</span></div>
+        <div class="metric-row"><span class="metric-name">Veritabanı</span><span class="metric-val ${hl.db.ok?'ok':'err'}">${dot(hl.db.ok)}${hl.db.ok?'Bağlı ('+hl.db.latencyMs+'ms)':'Hata'}</span></div>
+        <div class="metric-row"><span class="metric-name">Anthropic API</span><span class="metric-val ${hl.anthropic.ok?'ok':'err'}">${dot(hl.anthropic.ok)}${hl.anthropic.ok?'Aktif':'Erişilemiyor'}</span></div>
         <div class="metric-row"><span class="metric-name">OneSignal</span><span class="metric-val ${os.ok?'ok':'warn'}">${dot(os.ok)}${os.ok?'Aktif':'Bağlanamadı'}</span></div>
         <div class="metric-row"><span class="metric-name">Uptime</span><span class="metric-val">${fmtUp(sv.uptime||0)}</span></div>
-        <div class="metric-row"><span class="metric-name">Node.js</span><span class="metric-val">${sv.nodeVersion||'—'}</span></div>
-        <div class="metric-row"><span class="metric-name">Ortam</span><span class="metric-val">${sv.env||'—'}</span></div>
+        <div class="metric-row"><span class="metric-name">Node.js</span><span class="metric-val">${esc(sv.nodeVersion||'—')}</span></div>
+        <div class="metric-row"><span class="metric-name">Ortam</span><span class="metric-val">${esc(sv.env||'—')}</span></div>
       </div>
       <div class="section">
-        <h2><span class="ico">⚠️</span> Son Hatalar</h2>
+        <h2><span class="ico">⚠️</span> Son Hatalar <span style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(Supabase'den)</span></h2>
         <div class="error-list">${errHTML}</div>
       </div>
     </div>
+    <div class="section"><h2><span class="ico">♈</span> Burç Dağılımı</h2><div style="columns:2;gap:20px">${signHTML}</div></div>
+    ${renderCronSection()}
+  </div>`;
+}
 
-    <div class="section">
-      <h2><span class="ico">♈</span> Burç Dağılımı</h2>
-      <div style="columns:2;gap:20px">${signHTML}</div>
+function renderFeedback() {
+  const { fb } = _c;
+  if (fb.ok === false) {
+    return `<div class="tab-panel" id="tab-feedback">${emptyState('Geri bildirim verisi alınamadı: ' + esc(fb.error||'Bilinmeyen hata'))}</div>`;
+  }
+  const hasFeedback = (fb.total||0) > 0;
+  const TYPE_LABELS = { personality_planet:'Kişilik · Gezegen', personality_summary:'Kişilik · Özet', daily_focus:'Günlük Odak' };
+
+  const byTypeHTML = !hasFeedback ? emptyState('Henüz geri bildirim yok')
+    : Object.entries(fb.byType||{}).map(([type,counts])=>{
+        const t = counts.positive+counts.negative;
+        const posP = t>0 ? Math.round(counts.positive/t*100) : 0;
+        return `<div style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--text)">${esc(TYPE_LABELS[type]||type)}</span>
+            <span style="font-size:13px;color:var(--muted)">%${posP} olumlu · ${t} toplam</span>
+          </div>
+          <div style="display:flex;gap:3px;height:8px;border-radius:4px;overflow:hidden">
+            <div style="width:${posP}%;background:#4caf7d;border-radius:4px 0 0 4px"></div>
+            <div style="flex:1;background:#e05c5c;border-radius:0 4px 4px 0"></div>
+          </div>
+        </div>`;
+      }).join('');
+
+  const trendMax = Math.max(...(fb.dailyTrend||[]).map(x=>x.positive+x.negative), 1);
+  const trendHTML = !(fb.dailyTrend||[]).length ? '' : (fb.dailyTrend||[]).map(d=>{
+    const t = d.positive+d.negative;
+    const barH = t>0 ? Math.max(8, Math.round(t/trendMax*64)) : 4;
+    const posP = t>0 ? Math.round(d.positive/t*100) : 0;
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="width:100%;height:${barH}px;border-radius:3px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="height:${posP}%;background:#4caf7d"></div>
+        <div style="flex:1;background:#e05c5c"></div>
+      </div>
+      <span style="font-size:9px;color:var(--muted2)">${esc((d.date||'').slice(5))}</span>
+    </div>`;
+  }).join('');
+
+  return `<div class="tab-panel" id="tab-feedback">
+    <div class="cards">
+      <div class="card c-green"><div class="card-label">Toplam Feedback (30g)</div><div class="card-value">${fmt(fb.total)}</div><div class="card-sub">${fb.posRate!=null ? '%'+fb.posRate+' olumlu' : '—'}${fb.totalAllTime ? ' · Tüm zamanlar: '+fmt(fb.totalAllTime) : ''}</div></div>
+      <div class="card c-accent"><div class="card-label">Olumlu</div><div class="card-value">${fmt(fb.positive)}</div><div class="card-sub">Bu hafta: ${fmt(fb.week7)}</div></div>
+      <div class="card c-red"><div class="card-label">Olumsuz</div><div class="card-value">${fmt(fb.negative)}</div><div class="card-sub">${(fb.total||0)>0 ? '%'+(100-(fb.posRate||0))+' oran' : '—'}</div></div>
     </div>
+    <div class="grid2">
+      <div class="section"><h2><span class="ico">📊</span> İçerik Türüne Göre</h2>${byTypeHTML}</div>
+      <div class="section"><h2><span class="ico">📅</span> 7 Günlük Trend</h2>
+        <div style="display:flex;align-items:flex-end;gap:8px;height:80px;padding-top:8px">${trendHTML}</div>
+      </div>
+    </div>
+  </div>`;
+}
 
-  </div>
-  `;
+// ─── Revenue tab ─────────────────────────────────────────────────────────────
+function renderRevenue() {
+  const { rv, an, profit } = _c;
+  if (!rv.ok) return `<div class="tab-panel" id="tab-revenue">${emptyState(rv.error||'Gelir verisi henüz yok. RevenueCat webhook entegre edilince burada görünecek.')}</div>`;
+
+  const EVENT_COLORS = { INITIAL_PURCHASE:'var(--green)', RENEWAL:'var(--blue)', CANCELLATION:'var(--red)', EXPIRATION:'var(--red)', NON_RENEWING_PURCHASE:'var(--purple)' };
+  const EVENT_TR = { INITIAL_PURCHASE:'Yeni Abone', RENEWAL:'Yenileme', CANCELLATION:'İptal', EXPIRATION:'Süre Doldu', UNCANCELLATION:'Geri Döndü', BILLING_ISSUE_DETECTED:'Ödeme Sorunu', NON_RENEWING_PURCHASE:'Tek Seferlik' };
+
+  const recentHTML = (rv.recentEvents||[]).map(e => `
+    <div class="event-row">
+      <span class="event-type" style="color:${EVENT_COLORS[e.type]||'var(--text)'}">${esc(EVENT_TR[e.type]||e.type)}</span>
+      <span class="event-amount">${e.amount!=null?fmtU(e.amount):'—'}</span>
+      <span style="flex:1;color:var(--muted);font-size:11px">${esc(e.product||'')}</span>
+      <span class="event-time">${esc(ago(e.at))}</span>
+    </div>`).join('') || emptyState('Henüz gelir olayı yok');
+
+  // Revenue chart
+  const dailyMax = Math.max(...(rv.dailyRevenue||[]).map(d=>d.amount), 0.01);
+
+  return `<div class="tab-panel" id="tab-revenue">
+    <div class="cards">
+      <div class="card c-green"><div class="card-label">Aylık Gelir (MRR)</div><div class="card-value">${fmtU(rv.mrr)}</div><div class="card-sub">Son 30 gün</div></div>
+      <div class="card c-accent"><div class="card-label">Bu Ay Toplam</div><div class="card-value">${fmtU(rv.monthRevenue)}</div><div class="card-sub">Aktif premium: ${fmt(rv.premiumCount)}</div></div>
+      <div class="card c-blue"><div class="card-label">ARPU</div><div class="card-value">${rv.arpu!=null?fmtU(rv.arpu):'—'}</div><div class="card-sub">Premium kullanıcı başına</div></div>
+      <div class="card ${(profit||0)>=0?'c-green':'c-red'}"><div class="card-label">Kârlılık</div><div class="card-value">${profit!=null?fmtU(profit):'—'}</div><div class="card-sub">Gelir − AI maliyeti (${fmtU(an.costUsd)})</div></div>
+    </div>
+    <div class="cards">
+      <div class="card c-purple"><div class="card-label">Trial → Paid</div><div class="card-value">${rv.trialConversion!=null?'%'+rv.trialConversion:'—'}</div><div class="card-sub">${fmt(rv.trials)} trial</div></div>
+      <div class="card c-red"><div class="card-label">Churn Rate</div><div class="card-value">${rv.churnRate!=null?'%'+rv.churnRate:'—'}</div><div class="card-sub">${fmt(rv.cancellations30d)} iptal / ${fmt(rv.renewals30d)} yenileme</div></div>
+    </div>
+    <div class="grid2">
+      <div class="section">
+        <h2><span class="ico">📈</span> Günlük Gelir — 30 Gün</h2>
+        <div style="display:flex;align-items:flex-end;gap:2px;height:80px">
+          ${(rv.dailyRevenue||[]).map(d => {
+            const h = d.amount > 0 ? Math.max(4, Math.round(d.amount/dailyMax*72)) : 2;
+            return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+              <div style="width:100%;height:${h}px;background:${d.amount>0?'var(--green)':'var(--border)'};border-radius:2px 2px 0 0;opacity:${d.amount>0?0.85:0.2}"></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span style="font-size:9px;color:var(--muted2)">${esc((rv.dailyRevenue||[])[0]?.date?.slice(5)||'')}</span>
+          <span style="font-size:9px;color:var(--muted2)">${esc((rv.dailyRevenue||[]).slice(-1)[0]?.date?.slice(5)||'')}</span>
+        </div>
+      </div>
+      <div class="section">
+        <h2><span class="ico">🧾</span> Son Olaylar</h2>
+        <div style="max-height:220px;overflow-y:auto">${recentHTML}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── Users tab ───────────────────────────────────────────────────────────────
+function renderUsers() {
+  return `<div class="tab-panel" id="tab-users">
+    <div class="users-toolbar">
+      <input type="text" id="user-search" placeholder="E-posta veya isim ara..." value="${esc(usersSearch)}" oninput="usersSearchDebounce(this.value)">
+      <select id="user-filter" onchange="usersFilter=this.value;usersPage=1;loadUsers()">
+        <option value="" ${usersFilter===''?'selected':''}>Tümü</option>
+        <option value="premium" ${usersFilter==='premium'?'selected':''}>Premium</option>
+        <option value="free" ${usersFilter==='free'?'selected':''}>Ücretsiz</option>
+      </select>
+    </div>
+    <div id="users-table-wrap"><div class="loading"><span class="spinner"></span>Yükleniyor...</div></div>
+  </div>`;
+}
+
+let _usersDebounce = null;
+function usersSearchDebounce(val) {
+  clearTimeout(_usersDebounce);
+  _usersDebounce = setTimeout(() => { usersSearch = val; usersPage = 1; loadUsers(); }, 400);
+}
+
+async function loadUsers() {
+  const wrap = document.getElementById('users-table-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="loading"><span class="spinner"></span></div>';
+  try {
+    const params = new URLSearchParams({ page: usersPage, limit: 30, filter: usersFilter, search: usersSearch });
+    const data = await apiFetch(`/dashboard/stats/users?${params}`);
+    const users = data.users || [];
+    const total = data.total || 0;
+    const pages = data.pages || 0;
+
+    if (!users.length) { wrap.innerHTML = emptyState('Kullanıcı bulunamadı'); return; }
+
+    const rows = users.map(u => `<tr>
+      <td>${esc(u.name)}</td>
+      <td>${esc(u.email)}</td>
+      <td>${esc(trSign(u.sunSign))}</td>
+      <td>${u.premium?'<span class="premium-badge">Premium</span>':'<span class="free-badge">Free</span>'}</td>
+      <td>${u.hasPush?'✓':'—'}</td>
+      <td>${u.lastInsight?esc(u.lastInsight):'<span style="color:var(--red)">Yok</span>'}</td>
+      <td>${u.feedbackTotal>0?(u.feedbackScore>0?'<span style="color:var(--green)">+'+u.feedbackScore+'</span>':'<span style="color:var(--red)">'+u.feedbackScore+'</span>'):'—'}</td>
+      <td style="color:var(--muted)">${esc((u.createdAt||'').slice(0,10))}</td>
+    </tr>`).join('');
+
+    wrap.innerHTML = `
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>İsim</th><th>E-posta</th><th>Burç</th><th>Durum</th><th>Push</th><th>Son Insight</th><th>Feedback</th><th>Kayıt</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">
+        <span style="font-size:12px;color:var(--muted)">${fmt(total)} kullanıcı</span>
+        <div class="pager">
+          <button onclick="usersPage=Math.max(1,usersPage-1);loadUsers()" ${usersPage<=1?'disabled':''}>← Önceki</button>
+          <span>${usersPage} / ${pages||1}</span>
+          <button onclick="usersPage=Math.min(${pages},usersPage+1);loadUsers()" ${usersPage>=pages?'disabled':''}>Sonraki →</button>
+        </div>
+      </div>`;
+  } catch(e) { wrap.innerHTML = emptyState('Hata: ' + e.message); }
+}
+
+// ─── Cohort renderer (used inside overview) ──────────────────────────────────
+function renderCohortSection() {
+  const { co } = _c;
+  if (!co.ok || !(co.cohorts||[]).length) return '';
+
+  const sum = co.summary || {};
+  const summaryCard = `<div class="cards" style="margin-bottom:12px">
+    <div class="card"><div class="card-label">D1 Retention</div><div class="card-value" style="font-size:20px;color:${(sum.d1||0)>=50?'var(--green)':'var(--red)'}">${sum.d1!=null?sum.d1+'%':'—'}</div></div>
+    <div class="card"><div class="card-label">D7 Retention</div><div class="card-value" style="font-size:20px;color:${(sum.d7||0)>=30?'var(--green)':'var(--red)'}">${sum.d7!=null?sum.d7+'%':'—'}</div></div>
+    <div class="card"><div class="card-label">D30 Retention</div><div class="card-value" style="font-size:20px;color:${(sum.d30||0)>=15?'var(--green)':'var(--red)'}">${sum.d30!=null?sum.d30+'%':'—'}</div></div>
+  </div>`;
+
+  function heatColor(v) {
+    if (v == null) return 'var(--border)';
+    if (v >= 70) return 'rgba(76,175,125,.7)';
+    if (v >= 50) return 'rgba(76,175,125,.45)';
+    if (v >= 30) return 'rgba(201,168,76,.45)';
+    if (v >= 15) return 'rgba(232,146,74,.4)';
+    return 'rgba(224,92,92,.35)';
+  }
+
+  const heatRows = co.cohorts.map(c => `<tr>
+    <td class="week-label">${esc(c.week)}</td>
+    <td class="size">${c.size}</td>
+    ${c.retention.map(v => `<td style="background:${heatColor(v)};color:var(--text)">${v!=null?v+'%':'—'}</td>`).join('')}
+  </tr>`).join('');
+
+  return `<div class="section">
+    <h2><span class="ico">📊</span> Cohort Retention</h2>
+    ${summaryCard}
+    <div style="overflow-x:auto">
+      <table class="cohort-tbl">
+        <thead><tr><th>Hafta</th><th>Kişi</th><th>W0</th><th>W1</th><th>W2</th><th>W3</th><th>W4</th></tr></thead>
+        <tbody>${heatRows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ─── Cron monitoring (inside system tab) ─────────────────────────────────────
+function renderCronSection() {
+  const { cr } = _c;
+  if (!cr.ok) return '';
+
+  const jobs = cr.jobs || {};
+  const jobCards = Object.entries(jobs).map(([name, j]) => {
+    const statusColor = j.error > 0 ? 'var(--red)' : 'var(--green)';
+    return `<div class="card">
+      <div class="card-label">${esc(name)}</div>
+      <div class="card-value" style="font-size:16px;color:${statusColor}">${j.success}/${j.total}</div>
+      <div class="card-sub">Son: ${j.lastRun ? esc(ago(j.lastRun)) : '—'}</div>
+      <div class="card-sub">${j.avgDuration ? 'Ort: '+Math.round(j.avgDuration/1000)+'s' : ''}</div>
+    </div>`;
+  }).join('');
+
+  const recent = (cr.recent || []).map(r => `
+    <div class="cron-row">
+      <span class="cron-job">${esc(r.job)}</span>
+      <span class="cron-status ${r.status==='success'?'ok':r.status==='error'?'err':'warn'}">${r.status==='success'?'✓':r.status==='error'?'✗':'⟳'}</span>
+      <span class="cron-time">${esc(ago(r.startedAt))}${r.durationMs?' · '+Math.round(r.durationMs/1000)+'s':''}</span>
+      <span class="cron-detail">${r.processed?esc(r.processed+' işlendi'):''} ${r.failed?'<span style="color:var(--red)">'+r.failed+' hata</span>':''} ${r.error?'<span style="color:var(--red)">'+esc(r.error.slice(0,80))+'</span>':''}</span>
+    </div>`).join('');
+
+  return `<div class="section">
+    <h2><span class="ico">🕐</span> Cron İşleri — Son 7 Gün</h2>
+    <div class="cards" style="margin-bottom:10px">${jobCards}</div>
+    <div style="max-height:200px;overflow-y:auto">${recent || emptyState('Henüz cron kaydı yok')}</div>
+  </div>`;
+}
+
+// ─── Main render (orchestrator) ──────────────────────────────────────────────
+function renderAll(stats, trend) {
+  computeShared(stats);
+
+  // Save scroll position
+  const scrollY = window.scrollY;
+
+  // Render all panels
+  const content = document.getElementById('content');
+  content.innerHTML = renderOverview() + renderRevenue() + renderMonetization() + renderUsers() + renderSystem() + renderFeedback();
+
+  // Activate the correct tab panel
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const active = document.getElementById('tab-' + currentTab);
+  if (active) active.classList.add('active');
+
+  // Restore scroll
+  window.scrollTo(0, scrollY);
 
   if (currentTab === 'overview') {
     requestAnimationFrame(() => redrawCharts());
+  }
+  if (currentTab === 'users') {
+    loadUsers();
   }
 }
 
@@ -612,7 +881,16 @@ function redrawCharts() {
 
 function drawBarChart(id, data, color, tooltipId) {
   const canvas = document.getElementById(id);
-  if (!canvas || !data.length) return;
+  if (!canvas) return;
+  if (!data.length || data.every(d => d.count === 0)) {
+    const ctx = canvas.getContext('2d');
+    const W = canvas.parentElement.clientWidth - 2;
+    canvas.width = W; canvas.height = 100;
+    ctx.clearRect(0, 0, W, 100);
+    ctx.fillStyle = '#3d4460'; ctx.font = '13px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('Henüz veri yok', W/2, 55);
+    return;
+  }
   const ctx = canvas.getContext('2d');
   const W = canvas.parentElement.clientWidth - 2;
   const H = 100;
@@ -663,7 +941,7 @@ function drawBarChart(id, data, color, tooltipId) {
     const bar = canvas._bars.find(b => mx >= b.x && mx < b.x + b.w);
     if (bar) {
       tt.style.display = 'block';
-      tt.innerHTML = `<strong>${bar.date}</strong>${bar.count}`;
+      tt.innerHTML = `<strong>${esc(bar.date)}</strong>${esc(String(bar.count))}`;
       const tx = e.clientX - rect.left - 40;
       tt.style.left = Math.max(0, tx) + 'px';
       tt.style.top  = '0px';
@@ -674,8 +952,23 @@ function drawBarChart(id, data, color, tooltipId) {
   canvas.onmouseleave = () => { tt.style.display = 'none'; };
 }
 
+// ─── Resize handler for canvas charts ─────────────────────────────────────────
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (currentTab === 'overview' && cachedTrend) redrawCharts();
+  }, 200);
+});
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
-if (token) showApp();
+if (token && !isTokenExpired(token)) {
+  showApp();
+} else if (token) {
+  // Expired token in localStorage — clean up
+  localStorage.removeItem('shimal_dash_token');
+  token = null;
+}
 </script>
 </body>
 </html>

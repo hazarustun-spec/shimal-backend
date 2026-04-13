@@ -1,7 +1,8 @@
 'use strict';
 
 const https = require('https');
-const { writeJson, internalError } = require('../utils/http');
+const { writeJson, internalError, badRequest } = require('../utils/http');
+const { isValidLatitude, isValidLongitude } = require('../utils/validate');
 
 // ─── NOAA API endpoints (free, no API key needed) ────────────────────────────
 const NOAA_KP_URL = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
@@ -10,6 +11,49 @@ const NOAA_KP_URL = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-in
 let cachedData = null;
 let cacheTimestamp = 0;
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+// ─── Static fallback when NOAA is completely unavailable ─────────────────────
+// Represents a calm day (Kp ~1.5) so the app still functions
+// Uses new NOAA object format: { time_tag, Kp, a_running, station_count }
+const NOAA_FALLBACK = Array.from({ length: 8 }, (_, i) => {
+  const d = new Date(Date.now() - (7 - i) * 3 * 60 * 60 * 1000);
+  return {
+    time_tag: d.toISOString(),
+    Kp: 1.5,
+    a_running: 3,
+    station_count: 10,
+  };
+});
+
+// ─── Normalize NOAA rows ──────────────────────────────────────────────────────
+// NOAA değiştirdi: eskiden array-of-arrays (header + rows), artık array-of-objects.
+// Her iki formatı da destekle.
+function normalizeRows(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+
+  const first = raw[0];
+
+  // Yeni format: array of objects { time_tag, Kp, ... }
+  if (typeof first === 'object' && !Array.isArray(first) && first !== null) {
+    return raw.map(r => ({
+      time_tag: r.time_tag || '',
+      kp: parseFloat(r.Kp ?? r.kp ?? 0),
+      stationCount: parseInt(r.station_count ?? 0, 10),
+    }));
+  }
+
+  // Eski format: first row is header, rest are data arrays
+  // ["time_tag", "Kp", "Kp_fraction", "a_running", "station_count"]
+  const dataRows = Array.isArray(first) && typeof first[0] === 'string' && isNaN(parseFloat(first[1]))
+    ? raw.slice(1)  // skip header row
+    : raw;
+
+  return dataRows.map(r => ({
+    time_tag: r[0] || '',
+    kp: parseFloat(r[1] ?? 0),
+    stationCount: parseInt(r[4] ?? 0, 10),
+  }));
+}
 
 // ─── Fetch JSON from NOAA ────────────────────────────────────────────────────
 function fetchNoaaKp() {
@@ -28,9 +72,38 @@ function fetchNoaaKp() {
   });
 }
 
+// ─── Kp → Sürekli uyku skoru ────────────────────────────────────────────────
+// Anchor noktaları arası lineer interpolasyon — her Kp değeri farklı skor üretir.
+// Ör: Kp 1.0→95, Kp 1.5→91, Kp 2.0→88, Kp 2.5→84, Kp 3.0→80
+function computeSleepScore(kp) {
+  const anchors = [
+    [0, 100],
+    [1, 95],
+    [3, 80],
+    [4, 65],
+    [5, 48],
+    [7, 28],
+    [9, 10],
+  ];
+
+  if (kp <= anchors[0][0]) return anchors[0][1];
+  if (kp >= anchors[anchors.length - 1][0]) return anchors[anchors.length - 1][1];
+
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const [x0, y0] = anchors[i];
+    const [x1, y1] = anchors[i + 1];
+    if (kp >= x0 && kp <= x1) {
+      const t = (kp - x0) / (x1 - x0);
+      return Math.round(y0 + t * (y1 - y0));
+    }
+  }
+  return 50;
+}
+
 // ─── Kp → Sleep impact mapping ───────────────────────────────────────────────
 function getSleepImpact(kp) {
   const kpNum = parseFloat(kp);
+  const sleepScore = computeSleepScore(kpNum);
 
   if (kpNum <= 1) return {
     level: 'sakin',
@@ -39,7 +112,7 @@ function getSleepImpact(kp) {
     color: '#4CAF50',
     emoji: '😴',
     sleepQuality: 'çok_iyi',
-    sleepScore: 95,
+    sleepScore,
     title: 'Kozmik Sessizlik',
     message: 'Manyetik alan tamamen sakin. Derin ve dinlendirici bir uyku için ideal gece.',
     advice: 'Bu geceyi değerlendir — vücudun en derin REM döngülerine ulaşabilir.',
@@ -57,7 +130,7 @@ function getSleepImpact(kp) {
     color: '#8BC34A',
     emoji: '🌙',
     sleepQuality: 'iyi',
-    sleepScore: 85,
+    sleepScore,
     title: 'Hafif Kozmik Aktivite',
     message: 'Manyetik alanda küçük dalgalanmalar var ama uyku kaliteni etkilemeyecek seviyede.',
     advice: 'Rahat bir gece geçireceksin. Rüyaların biraz daha canlı olabilir.',
@@ -75,7 +148,7 @@ function getSleepImpact(kp) {
     color: '#FFC107',
     emoji: '⚡',
     sleepQuality: 'orta',
-    sleepScore: 70,
+    sleepScore,
     title: 'Aktif Manyetik Alan',
     message: 'Dünya\'nın manyetik alanı normalden aktif. Hassas kişilerde uyku kalitesi düşebilir.',
     advice: 'Uykuya geçiş biraz uzayabilir. Gevşeme teknikleri uygula.',
@@ -94,7 +167,7 @@ function getSleepImpact(kp) {
     color: '#FF9800',
     emoji: '🌩',
     sleepQuality: 'düşük',
-    sleepScore: 55,
+    sleepScore,
     title: 'Jeomanyetik Fırtına (G1)',
     message: 'Küçük çaplı jeomanyetik fırtına aktif. Uyku döngülerin bozulabilir, gece uyanmaları olası.',
     advice: 'Bu gece normalden 30 dakika erken yat. Vücudunun ekstra dinlenmeye ihtiyacı var.',
@@ -114,7 +187,7 @@ function getSleepImpact(kp) {
     color: '#F44336',
     emoji: '🔴',
     sleepQuality: 'çok_düşük',
-    sleepScore: 35,
+    sleepScore,
     title: `Güçlü Jeomanyetik Fırtına (${kpNum <= 6 ? 'G2' : 'G3'})`,
     message: 'Güçlü jeomanyetik fırtına yaşanıyor. Uyku kalitesi ciddi şekilde etkilenebilir. Baş ağrısı, huzursuzluk ve gece uyanmaları olası.',
     advice: 'Bu gece sabırlı ol. Uyuyamazsan zorla — kalk, kitap oku, tekrar dene.',
@@ -136,7 +209,7 @@ function getSleepImpact(kp) {
     color: '#9C27B0',
     emoji: '🟣',
     sleepQuality: 'çok_düşük',
-    sleepScore: 20,
+    sleepScore,
     title: `Aşırı Jeomanyetik Fırtına (${kpNum <= 8 ? 'G4' : 'G5'})`,
     message: 'Nadir görülen şiddetli jeomanyetik fırtına! Dünya çapında uyku kalitesi etkileniyor. Baş ağrısı, anksiyete ve uykusuzluk yaygın.',
     advice: 'Bu çok nadir bir kozmik olay. Kendine nazik davran, yarın daha iyi olacak.',
@@ -163,8 +236,18 @@ function getLatitudeImpact(latitude) {
 // ─── Main handler ────────────────────────────────────────────────────────────
 async function handleGeomagnetic(req, res, _params, url) {
   try {
-    const lat = parseFloat(url.searchParams.get('lat') || '39.9'); // Default: Ankara
-    const lon = parseFloat(url.searchParams.get('lon') || '32.8');
+    // Parametre validation — lat/lon float range kontrolü (şekil bozuk = 400)
+    const rawLat = url.searchParams.get('lat');
+    const rawLon = url.searchParams.get('lon');
+    const lat = rawLat !== null ? parseFloat(rawLat) : 39.9; // Default: Ankara
+    const lon = rawLon !== null ? parseFloat(rawLon) : 32.8;
+
+    if (rawLat !== null && !isValidLatitude(lat)) {
+      return badRequest(res, 'Geçersiz enlem (-90 ile 90 arası olmalı)');
+    }
+    if (rawLon !== null && !isValidLongitude(lon)) {
+      return badRequest(res, 'Geçersiz boylam (-180 ile 180 arası olmalı)');
+    }
 
     // Fetch NOAA data (with cache)
     const now = Date.now();
@@ -176,28 +259,28 @@ async function handleGeomagnetic(req, res, _params, url) {
       } catch (fetchErr) {
         console.error('[Geomagnetic] NOAA fetch failed:', fetchErr.message);
         if (!cachedData) {
-          writeJson(res, 503, { error: 'Jeomanyetik veri şu an alınamıyor. Lütfen daha sonra tekrar deneyin.' });
-          return;
+          console.warn('[Geomagnetic] No cache available, using static fallback data');
+          cachedData = NOAA_FALLBACK;
+          // Don't update cacheTimestamp so we retry NOAA on next request
         }
-        // Use stale cache
+        // Use stale/fallback cache
       }
     }
 
-    // Parse NOAA data — array of arrays, first row is header
-    // Format: ["time_tag", "Kp", "Kp_fraction", "a_running", "station_count"]
-    const rows = cachedData.slice(1); // Skip header
+    // Normalize rows — handles both old array format and new object format
+    let rows = normalizeRows(cachedData);
     if (rows.length === 0) {
-      writeJson(res, 503, { error: 'NOAA verisinde kayıt bulunamadı.' });
-      return;
+      console.warn('[Geomagnetic] Empty rows after normalize, using fallback data');
+      rows = normalizeRows(NOAA_FALLBACK);
     }
 
     // Get latest and last 8 entries (24 hours, 3h intervals)
     const latest = rows[rows.length - 1];
     const last24h = rows.slice(-8);
 
-    const currentKp = parseFloat(latest[1]);
-    const maxKp24h = Math.max(...last24h.map(r => parseFloat(r[1])));
-    const avgKp24h = last24h.reduce((sum, r) => sum + parseFloat(r[1]), 0) / last24h.length;
+    const currentKp = latest.kp;
+    const maxKp24h = Math.max(...last24h.map(r => r.kp));
+    const avgKp24h = last24h.reduce((sum, r) => sum + r.kp, 0) / last24h.length;
 
     // Calculate sleep impact
     const sleepImpact = getSleepImpact(currentKp);
@@ -210,13 +293,13 @@ async function handleGeomagnetic(req, res, _params, url) {
 
     // Build 24h history for chart
     const history = last24h.map(row => ({
-      time: row[0],
-      kp: parseFloat(row[1]),
+      time: row.time_tag,
+      kp: row.kp,
     }));
 
     // Tonight forecast (simple: use trend)
     const recentTrend = rows.length >= 2
-      ? parseFloat(rows[rows.length - 1][1]) - parseFloat(rows[rows.length - 2][1])
+      ? rows[rows.length - 1].kp - rows[rows.length - 2].kp
       : 0;
 
     let tonightForecast = 'sakin';
@@ -229,8 +312,8 @@ async function handleGeomagnetic(req, res, _params, url) {
 
       current: {
         kp: currentKp,
-        time: latest[0],
-        stationCount: parseInt(latest[4] || '0'),
+        time: latest.time_tag,
+        stationCount: latest.stationCount,
       },
 
       last24h: {

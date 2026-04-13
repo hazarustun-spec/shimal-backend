@@ -14,7 +14,7 @@ const {
   calculateCompatibility,
 } = require('../services/transit-timeline');
 const { readJsonBody, writeJson, badRequest, internalError } = require('../utils/http');
-const { isValidBirthDate, isValidBirthTime } = require('../utils/validate');
+const { isValidBirthDate, isValidBirthTime, isValidLatitude, isValidLongitude } = require('../utils/validate');
 const supabase = require('../config/supabase');
 
 function parseBirthDateTime(birthDate, birthTime = '12:00') {
@@ -142,9 +142,15 @@ async function handleNatalChart(req, res, _params, url) {
     let birthTime = url.searchParams.get('birthTime') || '12:00';
     const rawLat  = url.searchParams.get('lat');
     const rawLon  = url.searchParams.get('lon');
-    const lat = rawLat != null ? (parseFloat(rawLat) || null) : null;
-    const lon = rawLon != null ? (parseFloat(rawLon) || null) : null;
+    const lat = rawLat != null ? parseFloat(rawLat) : null;
+    const lon = rawLon != null ? parseFloat(rawLon) : null;
 
+    if (lat !== null && !isValidLatitude(lat)) {
+      return badRequest(res, 'Geçersiz enlem (-90 ile 90 arası olmalı)');
+    }
+    if (lon !== null && !isValidLongitude(lon)) {
+      return badRequest(res, 'Geçersiz boylam (-180 ile 180 arası olmalı)');
+    }
     if (!birthDate || !isValidBirthDate(birthDate)) {
       return badRequest(res, 'Valid birthDate is required (YYYY-MM-DD)');
     }

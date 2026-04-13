@@ -2,8 +2,9 @@
 
 const supabase = require('../config/supabase');
 const { buildNatalChart } = require('../services/natal-chart');
-const { readJsonBody, writeJson, badRequest, internalError, checkOwnership } = require('../utils/http');
-const { isValidDeviceId, isValidBirthDate, isValidBirthTime, isValidText } = require('../utils/validate');
+const { readJsonBody, writeJson, badRequest, internalError, checkOwnership, checkCronKey } = require('../utils/http');
+const { issueNewToken } = require('../utils/session-token');
+const { isValidDeviceId, isValidBirthDate, isValidBirthTime, isValidText, isValidLatitude, isValidLongitude, isValidBirthPlace } = require('../utils/validate');
 
 const { toTR } = require('../utils/zodiac-tr');
 
@@ -12,7 +13,7 @@ async function handleUserRegister(req, res) {
     const body = await readJsonBody(req);
     const {
       deviceId, birthDate, birthTime, gender, relationshipStatus, workStatus,
-      birthPlace, birthLatitude, birthLongitude, preferredName,
+      birthPlace, birthLatitude, birthLongitude, preferredName, timezone,
     } = body;
 
     if (!deviceId || !isValidDeviceId(deviceId)) {
@@ -27,6 +28,18 @@ async function handleUserRegister(req, res) {
     if (preferredName && !isValidText(preferredName, 100)) {
       return badRequest(res, 'preferredName must be under 100 characters');
     }
+    if (!isValidBirthPlace(birthPlace)) {
+      return badRequest(res, 'birthPlace en fazla 200 karakter olabilir');
+    }
+    if (birthLatitude !== undefined && birthLatitude !== null && !isValidLatitude(birthLatitude)) {
+      return badRequest(res, 'Geçersiz enlem (-90 ile 90 arası olmalı)');
+    }
+    if (birthLongitude !== undefined && birthLongitude !== null && !isValidLongitude(birthLongitude)) {
+      return badRequest(res, 'Geçersiz boylam (-180 ile 180 arası olmalı)');
+    }
+    if (typeof gender === 'string' && gender.length > 32) return badRequest(res, 'gender alanı çok uzun');
+    if (typeof relationshipStatus === 'string' && relationshipStatus.length > 32) return badRequest(res, 'relationshipStatus alanı çok uzun');
+    if (typeof workStatus === 'string' && workStatus.length > 32) return badRequest(res, 'workStatus alanı çok uzun');
 
     const natalChart = buildNatalChart(birthDate, birthTime, birthLatitude || null, birthLongitude || null);
 
@@ -40,6 +53,9 @@ async function handleUserRegister(req, res) {
       _partOfFortune: natalChart.partOfFortune || null,
       _natalAspects: natalChart.natalAspects || null,
     };
+
+    const validTz = (typeof timezone === 'string' && timezone.length > 0 && timezone.length < 60)
+      ? timezone : null;
 
     const userData = {
       device_id: deviceId,
@@ -56,6 +72,7 @@ async function handleUserRegister(req, res) {
       moon_sign: natalChart.moonSign,
       ascendant_sign: natalChart.ascendantSign || null,
       natal_planets: natalPlanetsData,
+      ...(validTz && { timezone: validTz }),
       updated_at: new Date().toISOString(),
     };
 
@@ -85,8 +102,13 @@ async function handleUserRegister(req, res) {
       user = data;
     }
 
+    // Yeni random session token — DB'ye hash'i yazılır, client raw token saklar
+    // Rotation: her register/recover yeni token üretir, eskiyi invalidate eder
+    const sessionToken = await issueNewToken(deviceId);
+
     writeJson(res, 200, {
       success: true,
+      sessionToken,
       user: {
         id: user.id,
         sunSign: toTR(natalChart.sunSign),
@@ -108,7 +130,8 @@ async function handleUserPushToken(req, res) {
     if (!isValidDeviceId(deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    if (!checkOwnership(req, res, deviceId)) return;
+    // Strict: push token güncellemesi mutation
+    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
     if (!pushToken || typeof pushToken !== 'string' || pushToken.length < 10 || pushToken.length > 200) {
       return badRequest(res, 'Geçersiz bildirim token formatı');
     }
@@ -127,7 +150,7 @@ async function handleUserPushToken(req, res) {
 
 async function handleUserGet(req, res, params) {
   try {
-    if (!checkOwnership(req, res, params.deviceId)) return;
+    if (!(await checkOwnership(req, res, params.deviceId))) return;
 
     const { data: user, error } = await supabase
       .from('users')
@@ -151,7 +174,8 @@ async function handleUserDelete(req, res, params) {
     if (!isValidDeviceId(params.deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    if (!checkOwnership(req, res, params.deviceId)) return;
+    // Strict: hesap silme mutation — session token zorunlu
+    if (!(await checkOwnership(req, res, params.deviceId, { strict: true }))) return;
 
     const { data: user, error: findError } = await supabase
       .from('users')
@@ -188,7 +212,8 @@ async function handleUserDeletePost(req, res) {
     if (!deviceId || !isValidDeviceId(deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    if (!checkOwnership(req, res, deviceId)) return;
+    // Strict: hesap silme mutation — session token zorunlu
+    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
 
     const { data: user, error: findError } = await supabase
       .from('users')
@@ -218,12 +243,8 @@ async function handleUserDeletePost(req, res) {
 
 async function handleMigrateNatalCharts(req, res) {
   try {
-    // Auth: use CRON_API_KEY for admin endpoints
-    const cronKey = req.headers['x-cron-key'] || '';
-    if (!cronKey || cronKey !== process.env.CRON_API_KEY) {
-      writeJson(res, 401, { error: 'Unauthorized' });
-      return;
-    }
+    // Timing-safe + per-IP brute-force lockout (5 hata → 30dk)
+    if (!checkCronKey(req, res)) return;
 
     const { data: users, error } = await supabase
       .from('users')
@@ -295,11 +316,25 @@ async function handleUpdateProfile(req, res) {
     } = body;
 
     if (!deviceId || !isValidDeviceId(deviceId)) return badRequest(res, 'Geçersiz cihaz kimliği');
-    if (!checkOwnership(req, res, deviceId)) return;
+    // Strict: profile update mutation
+    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
 
     // Validate optional birth fields if provided
     if (birthDate && !isValidBirthDate(birthDate)) return badRequest(res, 'Geçersiz doğum tarihi');
     if (birthTime && !isValidBirthTime(birthTime)) return badRequest(res, 'Geçersiz doğum saati');
+    if (!isValidBirthPlace(birthPlace)) return badRequest(res, 'birthPlace en fazla 200 karakter olabilir');
+    if (birthLatitude !== undefined && birthLatitude !== null && !isValidLatitude(birthLatitude)) {
+      return badRequest(res, 'Geçersiz enlem');
+    }
+    if (birthLongitude !== undefined && birthLongitude !== null && !isValidLongitude(birthLongitude)) {
+      return badRequest(res, 'Geçersiz boylam');
+    }
+    if (preferredName !== undefined && preferredName !== null && String(preferredName).length > 100) {
+      return badRequest(res, 'preferredName en fazla 100 karakter olabilir');
+    }
+    if (typeof gender === 'string' && gender.length > 32) return badRequest(res, 'gender alanı çok uzun');
+    if (typeof relationshipStatus === 'string' && relationshipStatus.length > 32) return badRequest(res, 'relationshipStatus alanı çok uzun');
+    if (typeof workStatus === 'string' && workStatus.length > 32) return badRequest(res, 'workStatus alanı çok uzun');
 
     // Fetch current user
     const { data: user, error: fetchError } = await supabase
@@ -375,7 +410,8 @@ async function handleUserRefreshTime(req, res) {
     if (!deviceId || !isValidDeviceId(deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    if (!checkOwnership(req, res, deviceId)) return;
+    // Strict: refresh time update mutation
+    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
 
     const hour   = Number(refreshHour);
     const minute = Number(refreshMinute);
@@ -400,10 +436,39 @@ async function handleUserRefreshTime(req, res) {
   }
 }
 
+async function handleUpdatePremium(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    const { deviceId, isPremium } = body;
+
+    if (!deviceId || !isValidDeviceId(deviceId)) {
+      return badRequest(res, 'Geçersiz cihaz kimliği');
+    }
+    if (typeof isPremium !== 'boolean') {
+      return badRequest(res, 'isPremium boolean olmalı');
+    }
+    // Strict: premium status update mutation
+    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
+
+    const { error } = await supabase
+      .from('users')
+      .update({ is_premium: isPremium })
+      .eq('device_id', deviceId);
+
+    if (error) throw error;
+
+    console.log(`[User] Premium status: ${deviceId} → is_premium=${isPremium}`);
+    writeJson(res, 200, { success: true, isPremium });
+  } catch (error) {
+    internalError(res, error, '[User] Premium update error:', 'Premium durumu güncellenemedi');
+  }
+}
+
 module.exports = [
   ['POST', /^\/api\/user\/register$/, handleUserRegister],
   ['PUT', /^\/api\/user\/push-token$/, handleUserPushToken],
   ['PUT', /^\/api\/user\/profile$/, handleUpdateProfile],
+  ['PUT', /^\/api\/user\/premium$/, handleUpdatePremium],
   ['PUT', /^\/api\/user\/refresh-time$/, handleUserRefreshTime],
   ['POST', /^\/api\/user\/delete$/, handleUserDeletePost],
   ['POST', /^\/api\/user\/migrate-natal$/, handleMigrateNatalCharts],

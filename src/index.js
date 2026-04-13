@@ -5,6 +5,20 @@
 
 require('dotenv').config({ override: true });
 
+// ─── Sentry — crash reporting (init önce, her şeyden önce) ───────────────────
+const Sentry = require('@sentry/node');
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: 0.1,       // %10 performance trace
+    profilesSampleRate: 0.05,    // %5 profiling
+  });
+  console.log('[Sentry] Initialized');
+} else {
+  console.warn('[Sentry] SENTRY_DSN not set — crash reporting disabled');
+}
+
 // ─── Startup env validation ───────────────────────────────────────────────────
 const REQUIRED_ENV_VARS = [
   'SUPABASE_URL',
@@ -19,18 +33,18 @@ if (missingVars.length > 0) {
 
 const http = require('http');
 const cron    = require('node-cron');
-const SunCalc = require('suncalc');
+const { withCronLock } = require('./utils/cron-lock');
+// SunCalc kaldırıldı — sabah bildirimi artık sabit 08:30 (yerel saat)
 const supabase = require('./config/supabase');
-const { setSecurityHeaders, checkApiKey, writeJson, notFound, internalError, getRequestUrl } = require('./utils/http');
+const { setSecurityHeaders, checkApiKey, checkUserAgent, writeJson, notFound, internalError, getRequestUrl } = require('./utils/http');
 const { checkRateLimit } = require('./utils/rate-limit');
 const { sendDailyNotifications, sendPushNotification } = require('./services/push-service');
-const { generateInsightForUser } = require('./routes/daily');
+const { generateInsightForUser, recordFailedInsight, retryFailedInsights } = require('./routes/daily');
 
 // Route modules — each exports an array of [method, pattern, handler, keys?] tuples
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const dailyRoutes = require('./routes/daily');
-const guidanceRoutes = require('./routes/guidance');
 const transitRoutes = require('./routes/transits');
 const cosmicWeatherRoutes = require('./routes/cosmic-weather');
 const compatibilityRoutes = require('./routes/compatibility');
@@ -38,16 +52,20 @@ const geomagneticRoutes = require('./routes/geomagnetic');
 const personalityRoutes = require('./routes/personality');
 const feedbackRoutes = require('./routes/feedback');
 const demoRoutes = require('./routes/demo');
+const crashReportRoutes = require('./routes/crash-report');
 const dashboardRoutes = require('./routes/dashboard');
+const webhookRoutes = require('./routes/webhook');
 
 const PORT = Number(process.env.PORT || 3000);
 
 process.on('uncaughtException', (error) => {
   console.error('[Startup] Uncaught exception:', error);
+  Sentry.captureException(error);
 });
 
 process.on('unhandledRejection', (reason) => {
   console.error('[Startup] Unhandled rejection:', reason);
+  Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
 });
 
 // ─── Static handlers ──────────────────────────────────────────────────────────
@@ -62,7 +80,6 @@ async function handleRoot(_req, res) {
       profile: 'GET /api/user/:deviceId',
       pushToken: 'PUT /api/user/push-token',
       dailyInsight: 'GET /api/daily/:deviceId',
-      decisionGuidance: 'POST /api/guidance/decision',
       generateAll: 'POST /api/daily/generate-all',
       transitsToday: 'GET /api/transits/today',
       transitTimeline: 'GET /api/transits/timeline?days=14',
@@ -107,15 +124,19 @@ const routes = [
   ...authRoutes,
   ...userRoutes,
   ...dailyRoutes,
-  ...guidanceRoutes,
   ...transitRoutes,
   ...cosmicWeatherRoutes,
   ...compatibilityRoutes,
   ...geomagneticRoutes,
   ...personalityRoutes,
   ...feedbackRoutes,
-  ...demoRoutes,
+  // Demo routes sadece development/staging ortamında açık
+  // Demo rotaları SADECE explicit flag ile açılır (fail-closed).
+  // NODE_ENV ayarlı olmasa bile demo endpoint'leri kapalı kalır.
+  ...(process.env.ENABLE_DEMO === 'true' ? demoRoutes : []),
+  ...crashReportRoutes,
   ...dashboardRoutes,
+  ...webhookRoutes,
 ];
 
 // ─── Request dispatcher ───────────────────────────────────────────────────────
@@ -126,10 +147,13 @@ async function routeRequest(req, res) {
   if (req.method === 'OPTIONS') {
     const url = getRequestUrl(req);
     if (url.pathname.startsWith('/dashboard/')) {
+      const allowedOrigin = process.env.DASHBOARD_ORIGIN || '*';
+      const reqOrigin = req.headers.origin || '';
+      const corsOrigin = allowedOrigin === '*' ? '*' : (reqOrigin === allowedOrigin ? allowedOrigin : allowedOrigin);
       res.writeHead(204, {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'x-api-key, x-dashboard-key, content-type',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Origin': corsOrigin,
+        'Access-Control-Allow-Headers': 'x-api-key, x-dashboard-token, content-type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       });
     } else {
       res.writeHead(204);
@@ -144,12 +168,17 @@ async function routeRequest(req, res) {
   // Rate limiting (all /api/* endpoints)
   if (!checkRateLimit(req, res, url.pathname)) return;
 
+  // User-Agent bot tespiti (loglama amaçlı)
+  if (url.pathname.startsWith('/api/')) checkUserAgent(req);
+
   // API key check (skip public routes and cron endpoint which has its own auth)
   const isPublic = url.pathname === '/' || url.pathname === '/health';
   const isCron = url.pathname === '/api/daily/generate-all' || url.pathname === '/api/user/migrate-natal';
   const isDashboard = url.pathname === '/dashboard' || url.pathname.startsWith('/dashboard/');
-  const isDemo = url.pathname.startsWith('/api/demo/');
-  if (!isPublic && !isCron && !isDemo && !isDashboard) {
+  const isWebhook = url.pathname.startsWith('/api/webhook/');
+  // Demo bypass SADECE explicit ENABLE_DEMO=true ise aktif (fail-closed default)
+  const isDemo = url.pathname.startsWith('/api/demo/') && process.env.ENABLE_DEMO === 'true';
+  if (!isPublic && !isCron && !isDemo && !isDashboard && !isWebhook) {
     if (!checkApiKey(req, res)) return;
   }
 
@@ -209,26 +238,6 @@ function isWithin5Min(lh, lm, targetH, targetM) {
   return diff < 5;
 }
 
-// Kullanıcının doğum koordinatlarından bugünkü gündoğumu saatini hesaplar
-// Koordinat yoksa timezone'a göre mevsimsel tahmin kullanır
-function getSunriseHM(user, date) {
-  const tz  = user.timezone || 'Europe/Istanbul';
-  const lat = parseFloat(user.birth_latitude);
-  const lon = parseFloat(user.birth_longitude);
-  try {
-    if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
-      const times = SunCalc.getTimes(date, lat, lon);
-      if (times.sunrise && !isNaN(times.sunrise.getTime())) {
-        return getLocalHM(times.sunrise, tz);
-      }
-    }
-  } catch { /* fall through */ }
-  // Fallback: Türkiye için aylık ortalama gündoğumu saatleri (UTC+3)
-  const month = date.getMonth(); // 0=Ocak … 11=Aralık
-  const hours = [8, 7, 7, 6, 6, 5, 5, 6, 6, 7, 7, 8];
-  return { hour: hours[month], minute: 0 };
-}
-
 // Günlük push takibi (in-memory, server restart'ta sıfırlanır)
 // Her gün gece yarısı temizlenir
 const pushSent = {
@@ -256,49 +265,137 @@ async function getCachedUsers() {
   return usersCache;
 }
 
+// ─── Cron run tracking ───────────────────────────────────────────────────────
+async function recordCronStart(jobName) {
+  const startMs = Date.now();
+  try {
+    const SURL = process.env.SUPABASE_URL;
+    const KEY = process.env.SUPABASE_SERVICE_KEY;
+    const startedAt = new Date(startMs).toISOString();
+    const r = await fetch(`${SURL}/rest/v1/cron_runs`, {
+      method: 'POST',
+      headers: {
+        apikey: KEY, Authorization: `Bearer ${KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({ job_name: jobName, started_at: startedAt, status: 'running' }),
+    });
+    if (r.ok) {
+      const rows = await r.json();
+      return { id: rows[0]?.id || null, startMs };
+    }
+    return { id: null, startMs };
+  } catch { return { id: null, startMs }; }
+}
+
+async function recordCronEnd(run, status, { usersProcessed = 0, usersFailed = 0, errorMessage = null, metadata = null } = {}) {
+  const runId = run?.id;
+  if (!runId) return;
+  try {
+    const SURL = process.env.SUPABASE_URL;
+    const KEY = process.env.SUPABASE_SERVICE_KEY;
+    const finishedAt = new Date().toISOString();
+    const durationMs = run.startMs ? Date.now() - run.startMs : null;
+    await fetch(`${SURL}/rest/v1/cron_runs?id=eq.${runId}`, {
+      method: 'PATCH',
+      headers: {
+        apikey: KEY, Authorization: `Bearer ${KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        finished_at: finishedAt,
+        status,
+        duration_ms: durationMs,
+        users_processed: usersProcessed,
+        users_failed: usersFailed,
+        error_message: errorMessage ? String(errorMessage).slice(0, 500) : null,
+        metadata,
+      }),
+    });
+  } catch { /* fire-and-forget */ }
+}
+
 // ─── CRON 1 — Her sabah 03:00 UTC: Tüm insightları toplu üret ────────────────
 // Gündoğumundan ÖNCE tüm kullanıcılara ait insight hazırlanır.
 // generateInsightForUser zaten bugün varsa skip eder — güvenli çalıştırılabilir.
 
 cron.schedule('0 3 * * *', async () => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    console.log(`[DailyGen] ${today} için toplu insight üretimi başlıyor...`);
+  // Dağıtık kilit: 2 saat TTL, başka instance tutuyorsa skip
+  await withCronLock('daily-gen', 2 * 60 * 60, async () => {
+    const run = await recordCronStart('daily-gen');
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      console.log(`[DailyGen] ${today} için toplu insight üretimi başlıyor...`);
 
-    usersCache = null; // cache'i yenile
-    const users = await getCachedUsers();
-    if (!users.length) return;
+      usersCache = null; // cache'i yenile
+      const users = await getCachedUsers();
+      if (!users.length) {
+        await recordCronEnd(run, 'success', { metadata: { skipped: 0, total: 0 } });
+        return;
+      }
 
-    let generated = 0, skipped = 0, errors = 0;
-    const BATCH = 3; // Anthropic rate limit'e saygı
-    for (let i = 0; i < users.length; i += BATCH) {
-      const batch = users.slice(i, i + BATCH);
-      await Promise.allSettled(batch.map(async (user) => {
-        try {
-          const result = await generateInsightForUser(user, today);
-          if (result === 'skipped') { skipped++; return; }
-          generated++;
-        } catch (err) {
-          errors++;
-          console.error(`[DailyGen] ✗ ${user.id}:`, err.message);
-        }
-      }));
-      // Batch'ler arasında kısa bekleme
-      if (i + BATCH < users.length) await new Promise(r => setTimeout(r, 500));
+      let generated = 0, skipped = 0, errors = 0;
+      const BATCH = 3; // Anthropic rate limit'e saygı
+      for (let i = 0; i < users.length; i += BATCH) {
+        const batch = users.slice(i, i + BATCH);
+        await Promise.allSettled(batch.map(async (user) => {
+          try {
+            const result = await generateInsightForUser(user, today);
+            if (result === 'skipped') { skipped++; return; }
+            generated++;
+          } catch (err) {
+            errors++;
+            console.error(`[DailyGen] ✗ ${user.id}:`, err.message);
+            // Başarısız üretimi kaydet — 06:00 retry cron'u yeniden dener
+            await recordFailedInsight(user.id, today, err.message);
+          }
+        }));
+        // Batch'ler arasında kısa bekleme
+        if (i + BATCH < users.length) await new Promise(r => setTimeout(r, 500));
+      }
+
+      console.log(`[DailyGen] Tamamlandı: ${generated} üretildi, ${skipped} atlandı, ${errors} hata.`);
+      await recordCronEnd(run, 'success', { usersProcessed: generated, usersFailed: errors, metadata: { skipped, total: users.length } });
+    } catch (err) {
+      console.error('[DailyGen] Genel hata:', err.message);
+      await recordCronEnd(run, 'error', { errorMessage: err.message });
     }
-
-    console.log(`[DailyGen] Tamamlandı: ${generated} üretildi, ${skipped} atlandı, ${errors} hata.`);
-  } catch (err) {
-    console.error('[DailyGen] Genel hata:', err.message);
-  }
+  });
 }, { timezone: 'UTC' });
 
-// ─── CRON 2 — Her dakika: 3 farklı saatte push bildirim gönder ───────────────
+// ─── CRON 2 — 06:00 UTC: Başarısız insight'ları retry et ────────────────────
+// 03:00 cron'unda üretilemeyen insight'lar failed_insights tablosuna kaydedilir.
+// 06:00'da bu kullanıcılar için tekrar denenir (max 3 toplam deneme).
+
+cron.schedule('0 6 * * *', async () => {
+  await withCronLock('retry-gen', 60 * 60, async () => {
+    const run = await recordCronStart('retry-gen');
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      console.log(`[RetryGen] ${today} için başarısız insight retry başlıyor...`);
+
+      const { retried, recovered, stillFailing } = await retryFailedInsights(today);
+
+      console.log(`[RetryGen] Tamamlandı: ${recovered}/${retried} kurtarıldı, ${stillFailing} hâlâ başarısız.`);
+      await recordCronEnd(run, 'success', { usersProcessed: recovered, usersFailed: stillFailing, metadata: { retried } });
+    } catch (err) {
+      console.error('[RetryGen] Retry cron hatası:', err.message);
+      await recordCronEnd(run, 'error', { errorMessage: err.message });
+    }
+  });
+}, { timezone: 'UTC' });
+
+// ─── CRON 3 — Her dakika: 3 farklı saatte push bildirim gönder ───────────────
 // • Sabah  → Gündoğumu saatinde: AI insight bildirimi
 // • Öğlen  → 13:00 yerel saatte: hatırlatma
 // • Akşam  → 20:00 yerel saatte: hatırlatma
 
 cron.schedule('* * * * *', async () => {
+  // Push cron her dakika çalışır — 50sn TTL ile lock alıyoruz.
+  // Sonraki dakika'daki çağrı expired lock'u temizleyip devralır.
+  await withCronLock('push-cron', 50, async () => {
   try {
     const now   = new Date();
     const today = now.toISOString().split('T')[0];
@@ -310,14 +407,21 @@ cron.schedule('* * * * *', async () => {
     const afternoonDue = [];
     const eveningDue   = [];
 
+    // Sabit saatler (her kullanıcı için kendi yerel saatiyle):
+    //   Sabah  → 08:30
+    //   Öğle   → 13:00
+    //   Akşam  → 20:00
+    const MORNING_H = 8,  MORNING_M = 30;
+    const NOON_H    = 13, NOON_M    = 0;
+    const EVENING_H = 20, EVENING_M = 0;
+
     for (const user of users) {
       const tz          = user.timezone || 'Europe/Istanbul';
       const { hour, minute } = getLocalHM(now, tz);
-      const sunrise     = getSunriseHM(user, now);
 
-      if (!pushSent.morning.has(user.id)   && isWithin5Min(hour, minute, sunrise.hour, sunrise.minute)) morningDue.push(user);
-      if (!pushSent.afternoon.has(user.id) && isWithin5Min(hour, minute, 13, 0))  afternoonDue.push(user);
-      if (!pushSent.evening.has(user.id)   && isWithin5Min(hour, minute, 20, 0))  eveningDue.push(user);
+      if (!pushSent.morning.has(user.id)   && isWithin5Min(hour, minute, MORNING_H, MORNING_M)) morningDue.push(user);
+      if (!pushSent.afternoon.has(user.id) && isWithin5Min(hour, minute, NOON_H, NOON_M))       afternoonDue.push(user);
+      if (!pushSent.evening.has(user.id)   && isWithin5Min(hour, minute, EVENING_H, EVENING_M)) eveningDue.push(user);
     }
 
     // ── Sabah: AI insight bildirimi ──────────────────────────────────────────
@@ -377,13 +481,18 @@ cron.schedule('* * * * *', async () => {
   } catch (err) {
     console.error('[Push-Cron] Genel hata:', err.message);
   }
+  }); // withCronLock('push-cron')
 }, { timezone: 'UTC' });
 
 // ─── CRON 3 — Gece yarısı 00:00 UTC: push takibini sıfırla ──────────────────
-cron.schedule('0 0 * * *', () => {
-  pushSent.morning.clear();
-  pushSent.afternoon.clear();
-  pushSent.evening.clear();
-  usersCache = null; // yeni gün, yeni kullanıcı cache'i
-  console.log('[Cron] Push takibi ve kullanıcı cache temizlendi.');
+cron.schedule('0 0 * * *', async () => {
+  await withCronLock('midnight-reset', 10 * 60, async () => {
+    const run = await recordCronStart('midnight-reset');
+    pushSent.morning.clear();
+    pushSent.afternoon.clear();
+    pushSent.evening.clear();
+    usersCache = null; // yeni gün, yeni kullanıcı cache'i
+    console.log('[Cron] Push takibi ve kullanıcı cache temizlendi.');
+    await recordCronEnd(run, 'success');
+  });
 }, { timezone: 'UTC' });
