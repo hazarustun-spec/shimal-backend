@@ -51,7 +51,6 @@ const compatibilityRoutes = require('./routes/compatibility');
 const geomagneticRoutes = require('./routes/geomagnetic');
 const personalityRoutes = require('./routes/personality');
 const feedbackRoutes = require('./routes/feedback');
-const demoRoutes = require('./routes/demo');
 const crashReportRoutes = require('./routes/crash-report');
 const dashboardRoutes = require('./routes/dashboard');
 const webhookRoutes = require('./routes/webhook');
@@ -74,22 +73,7 @@ async function handleRoot(_req, res) {
   writeJson(res, 200, {
     name: 'Shimal API',
     version: '1.0.0',
-    endpoints: {
-      health: 'GET /health',
-      register: 'POST /api/user/register',
-      profile: 'GET /api/user/:deviceId',
-      pushToken: 'PUT /api/user/push-token',
-      dailyInsight: 'GET /api/daily/:deviceId',
-      generateAll: 'POST /api/daily/generate-all',
-      transitsToday: 'GET /api/transits/today',
-      transitTimeline: 'GET /api/transits/timeline?days=14',
-      moonPhase: 'GET /api/transits/moon-phase',
-      natalChart: 'GET /api/transits/natal-chart?birthDate=1995-03-15&birthTime=14:30',
-      compatibility: 'POST /api/transits/compatibility',
-      cosmicWeather: 'GET /api/cosmic-weather',
-      compatibilityLite: 'POST /api/compatibility',
-      geomagnetic: 'GET /api/geomagnetic?lat=41.0&lon=29.0',
-    },
+    status: 'operational',
   });
 }
 
@@ -130,10 +114,6 @@ const routes = [
   ...geomagneticRoutes,
   ...personalityRoutes,
   ...feedbackRoutes,
-  // Demo routes sadece development/staging ortamında açık
-  // Demo rotaları SADECE explicit flag ile açılır (fail-closed).
-  // NODE_ENV ayarlı olmasa bile demo endpoint'leri kapalı kalır.
-  ...(process.env.ENABLE_DEMO === 'true' ? demoRoutes : []),
   ...crashReportRoutes,
   ...dashboardRoutes,
   ...webhookRoutes,
@@ -176,9 +156,7 @@ async function routeRequest(req, res) {
   const isCron = url.pathname === '/api/daily/generate-all' || url.pathname === '/api/user/migrate-natal';
   const isDashboard = url.pathname === '/dashboard' || url.pathname.startsWith('/dashboard/');
   const isWebhook = url.pathname.startsWith('/api/webhook/');
-  // Demo bypass SADECE explicit ENABLE_DEMO=true ise aktif (fail-closed default)
-  const isDemo = url.pathname.startsWith('/api/demo/') && process.env.ENABLE_DEMO === 'true';
-  if (!isPublic && !isCron && !isDemo && !isDashboard && !isWebhook) {
+  if (!isPublic && !isCron && !isDashboard && !isWebhook) {
     if (!checkApiKey(req, res)) return;
   }
 
