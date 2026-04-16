@@ -229,6 +229,68 @@ canvas{display:block;width:100%!important}
 .event-type{font-weight:600;width:130px;flex-shrink:0}
 .event-amount{color:var(--green);font-weight:700;width:70px;text-align:right;flex-shrink:0}
 .event-time{color:var(--muted);flex-shrink:0}
+
+/* ── Architecture tab ── */
+.arch-flow{display:flex;flex-direction:column;gap:16px;align-items:center;padding:12px 0}
+.arch-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;width:100%}
+.arch-arrow{color:var(--accent);font-size:16px;opacity:.35;letter-spacing:8px;text-align:center}
+.arch-node{background:rgba(201,168,76,.04);border:1.5px solid rgba(201,168,76,.15);border-radius:14px;padding:14px 18px;text-align:center;min-width:150px;max-width:195px;flex:1;transition:all .2s;text-decoration:none;color:var(--text);display:block}
+.arch-node:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.4);background:rgba(201,168,76,.08)}
+.arch-node .an-icon{font-size:24px;display:block;margin-bottom:4px}
+.arch-node .an-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.arch-node .an-desc{font-size:10px;color:var(--muted);line-height:1.3}
+.arch-node-center{background:rgba(201,168,76,.08);border:2px solid var(--accent);border-radius:16px;padding:18px 28px;max-width:240px;cursor:default}
+.arch-node-center .an-icon{font-size:32px}
+.arch-node-center .an-name{font-size:16px}
+.arch-node-dim{background:rgba(255,255,255,.02);border-color:var(--border)}
+.arch-node-dim:hover{border-color:rgba(201,168,76,.4);background:rgba(201,168,76,.04)}
+
+.int-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-top:14px}
+.int-c{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;text-decoration:none;color:var(--text);display:block;transition:all .2s;position:relative;overflow:hidden}
+.int-c:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.int-c::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:0;transition:opacity .2s}
+.int-c:hover::before{opacity:1}
+.int-c-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.int-c-icon{font-size:22px;width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(201,168,76,.1)}
+.int-c-title{font-size:14px;font-weight:600}
+.int-c-cat{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.int-c-desc{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px}
+.int-c-rows{display:flex;flex-direction:column;gap:4px}
+.int-c-row{display:flex;align-items:center;gap:6px;font-size:11px}
+.int-c-lbl{color:var(--muted2);min-width:60px;flex-shrink:0}
+.int-c-val{color:var(--muted);font-family:monospace;font-size:10px;background:rgba(255,255,255,.04);padding:1px 6px;border-radius:3px}
+.int-c-badge{display:inline-block;padding:1px 7px;border-radius:5px;font-size:10px;font-weight:500}
+.int-badge-ios{background:rgba(91,141,238,.12);color:var(--blue)}
+.int-badge-be{background:rgba(155,127,232,.12);color:var(--purple)}
+.int-badge-web{background:rgba(232,74,130,.12);color:#e84a82}
+.int-badge-ok{background:rgba(76,175,125,.12);color:var(--green)}
+.int-c-link{font-size:11px;color:var(--accent);margin-top:8px;opacity:0;transition:opacity .2s}
+.int-c:hover .int-c-link{opacity:1}
+
+.arch-cat-title{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:20px 0 6px;display:flex;align-items:center;gap:7px}
+.arch-cat-title .ico{font-size:14px}
+
+.flow-steps{margin-top:14px}
+.flow-s{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border)}
+.flow-s:last-child{border-bottom:none}
+.flow-s-num{width:28px;height:28px;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0}
+.flow-s h4{font-size:13px;font-weight:600;margin-bottom:3px}
+.flow-s p{font-size:12px;color:var(--muted);line-height:1.4}
+.flow-s code{font-family:monospace;font-size:10px;background:rgba(201,168,76,.1);padding:1px 5px;border-radius:3px;color:var(--accent)}
+
+.env-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.env-tbl th{text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 10px;border-bottom:2px solid var(--border)}
+.env-tbl td{padding:8px 10px;border-bottom:1px solid var(--border)}
+.env-tbl tr:hover td{background:rgba(201,168,76,.02)}
+.env-tbl .env-n{font-family:monospace;font-size:11px;color:var(--accent)}
+
+.checklist-cols{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:14px}
+@media(max-width:600px){.checklist-cols{grid-template-columns:1fr}}
+.cl-col h4{font-size:13px;margin-bottom:10px}
+.cl-col h4.cl-done{color:var(--green)}
+.cl-col h4.cl-todo{color:var(--accent)}
+.cl-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:3px 0}
+@media(max-width:700px){.int-cards{grid-template-columns:1fr}.arch-row{flex-direction:column;align-items:center}.arch-node{max-width:100%;min-width:auto}}
 </style>
 </head>
 <body>
@@ -258,6 +320,7 @@ canvas{display:block;width:100%!important}
         <button class="tab" onclick="switchTab('system',this)">Sistem</button>
         <button class="tab" onclick="switchTab('feedback',this)">Geri Bildirim</button>
         <button class="tab" onclick="switchTab('links',this)">Kısayollar</button>
+        <button class="tab" onclick="switchTab('architecture',this)">Mimari</button>
       </nav>
     </div>
     <div class="header-right">
@@ -864,7 +927,7 @@ function renderAll(stats, trend) {
 
   // Render all panels
   const content = document.getElementById('content');
-  content.innerHTML = renderOverview() + renderRevenue() + renderMonetization() + renderUsers() + renderSystem() + renderFeedback() + renderLinks();
+  content.innerHTML = renderOverview() + renderRevenue() + renderMonetization() + renderUsers() + renderSystem() + renderFeedback() + renderLinks() + renderArchitecture();
 
   // Activate the correct tab panel
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -910,6 +973,216 @@ function renderLinks() {
       <h2><span class="ico">🔗</span> Servis Kisayollari</h2>
       <div class="links-grid">${cards}</div>
     </div>
+  </div>`;
+}
+
+// ─── Architecture / Integration Map ─────────────────────────────────────────
+function renderArchitecture() {
+  // Architecture diagram nodes
+  function node(icon, name, desc, url, cls='') {
+    if (url) return `<a class="arch-node ${cls}" href="${url}" target="_blank" rel="noopener"><span class="an-icon">${icon}</span><div class="an-name">${name}</div><div class="an-desc">${desc}</div></a>`;
+    return `<div class="arch-node ${cls}"><span class="an-icon">${icon}</span><div class="an-name">${name}</div><div class="an-desc">${desc}</div></div>`;
+  }
+
+  // Integration card
+  function intCard(o) {
+    const rows = (o.rows||[]).map(r => {
+      if (r.badge) return `<div class="int-c-row"><span class="int-c-lbl">${r.l}</span><span class="int-c-badge ${r.badge}">${r.v}</span></div>`;
+      return `<div class="int-c-row"><span class="int-c-lbl">${r.l}</span><span class="int-c-val">${r.v}</span></div>`;
+    }).join('');
+    const link = o.url ? `<div class="int-c-link">${o.urlLabel || o.url.replace('https://','').split('/')[0]} →</div>` : '';
+    return `<a class="int-c" href="${o.url||'#'}" target="_blank" rel="noopener">
+      <div class="int-c-head"><div class="int-c-icon" ${o.iconBg?`style="background:${o.iconBg}"`:''}">${o.icon}</div><div><div class="int-c-title">${o.title}</div><div class="int-c-cat">${o.cat}</div></div></div>
+      <div class="int-c-desc">${o.desc}</div>
+      <div class="int-c-rows">${rows}</div>
+      ${link}
+    </a>`;
+  }
+
+  // Diagram
+  const diagram = `
+    <div class="section">
+      <h2><span class="ico">🗺️</span> Mimari Genel Bakış</h2>
+      <div class="arch-flow">
+        <div class="arch-row">${node('📱','Shimal iOS','SwiftUI · MVVM · iOS 17+',null,'arch-node-center')}</div>
+        <div class="arch-arrow">▼ ▼ ▼</div>
+        <div class="arch-row">
+          ${node('🚂','Railway','Node.js / Express Backend','https://railway.app/dashboard')}
+          ${node('💰','RevenueCat','Abonelik Yönetimi','https://app.revenuecat.com')}
+          ${node('🍎','Apple Services','Sign In · APNs · App Store','https://appstoreconnect.apple.com')}
+        </div>
+        <div class="arch-arrow">▼ ▼ ▼</div>
+        <div class="arch-row">
+          ${node('🧠','Claude AI','Günlük içerik üretimi','https://console.anthropic.com')}
+          ${node('🗄️','Supabase','PostgreSQL Veritabanı','https://supabase.com/dashboard')}
+          ${node('🔔','OneSignal','Push Bildirimler','https://app.onesignal.com')}
+          ${node('🪐','SwissEph','Gezegen Hesaplama','https://www.astro.com/swisseph/')}
+        </div>
+        <div class="arch-arrow" style="opacity:.2">· · · · ·</div>
+        <div class="arch-row">
+          ${node('🌐','GitHub Pages','shimal.app Web Sitesi','https://github.com/hazarustun-spec/Shimal-Website','arch-node-dim')}
+          ${node('📧','ImprovMX','hello@shimal.app','https://improvmx.com','arch-node-dim')}
+          ${node('⏰','node-cron','Zamanlanmış Görevler','https://www.npmjs.com/package/node-cron','arch-node-dim')}
+        </div>
+      </div>
+    </div>`;
+
+  // Integration cards by category
+  const aiBackend = `
+    <div class="arch-cat-title"><span class="ico">🧠</span> Yapay Zeka & Backend</div>
+    <div class="int-cards">
+      ${intCard({icon:'🧠',title:'Anthropic Claude AI',cat:'Yapay Zeka · İçerik',desc:'Her gün kullanıcıların doğum haritasına göre kişiselleştirilmiş burç içgörüleri üretir.',url:'https://console.anthropic.com',urlLabel:'console.anthropic.com',iconBg:'rgba(201,168,76,.12)',rows:[
+        {l:'Model',v:'claude-3.5-sonnet'},{l:'Env Key',v:'ANTHROPIC_API_KEY'},{l:'Kullanım',v:'Backend',badge:'int-badge-be'},{l:'Durum',v:'Aktif ✓',badge:'int-badge-ok'}
+      ]})}
+      ${intCard({icon:'🚂',title:'Railway',cat:'Hosting · Deploy',desc:'Node.js/Express backend burada çalışıyor. GitHub push → otomatik deploy.',url:'https://railway.app/dashboard',urlLabel:'railway.app',iconBg:'rgba(155,127,232,.12)',rows:[
+        {l:'URL',v:'shimal-backend-production.up.railway.app'},{l:'Deploy',v:'GitHub → main branch'},{l:'Durum',v:'Aktif ✓',badge:'int-badge-ok'}
+      ]})}
+      ${intCard({icon:'🗄️',title:'Supabase',cat:'Veritabanı · PostgreSQL',desc:'Kullanıcılar, günlük içgörüler, geri bildirimler burada. REST API erişimi.',url:'https://supabase.com/dashboard',urlLabel:'supabase.com',iconBg:'rgba(6,182,212,.12)',rows:[
+        {l:'Tablolar',v:'users · daily_insights · feedback · cron_lock'},{l:'Env Keys',v:'SUPABASE_URL · SERVICE_KEY'},{l:'Durum',v:'Aktif ✓',badge:'int-badge-ok'}
+      ]})}
+    </div>`;
+
+  const payments = `
+    <div class="arch-cat-title"><span class="ico">💰</span> Ödeme & Abonelik</div>
+    <div class="int-cards">
+      ${intCard({icon:'💰',title:'RevenueCat',cat:'Abonelik Yönetimi',desc:'App Store aboneliklerini yönetir. Premium kontrolü, makbuz doğrulama.',url:'https://app.revenuecat.com',urlLabel:'app.revenuecat.com',iconBg:'rgba(76,175,125,.12)',rows:[
+        {l:'Ürünler',v:'shimal.premium.weekly · monthly'},{l:'Offerings',v:'$rc_weekly · $rc_monthly'},{l:'Kullanım',v:'iOS SDK',badge:'int-badge-ios'},{l:'Durum',v:'Aktif ✓',badge:'int-badge-ok'}
+      ]})}
+      ${intCard({icon:'🍎',title:'App Store Connect',cat:'Apple · Dağıtım',desc:'Uygulama yükleme, TestFlight, abonelik ürünleri, App Store süreçleri.',url:'https://appstoreconnect.apple.com',urlLabel:'appstoreconnect.apple.com',iconBg:'rgba(90,90,90,.15)',rows:[
+        {l:'Bundle ID',v:'com.shimal.app'},{l:'Agreement',v:'Paid Apps — Aktif ✓',badge:'int-badge-ok'},{l:'Ürünler',v:'Haftalık + Aylık — Ready to Submit'}
+      ]})}
+    </div>`;
+
+  const auth = `
+    <div class="arch-cat-title"><span class="ico">🔐</span> Kimlik Doğrulama & Bildirim</div>
+    <div class="int-cards">
+      ${intCard({icon:'🔑',title:'Sign in with Apple',cat:'Kimlik Doğrulama',desc:'Tek giriş yöntemi. Apple ID ile giriş, backend JWT doğrulama.',url:'https://developer.apple.com/account',urlLabel:'developer.apple.com',iconBg:'rgba(91,141,238,.12)',rows:[
+        {l:'Akış',v:'identityToken → /api/auth/apple → JWT'},{l:'Kullanım',v:'iOS + Backend',badge:'int-badge-be'}
+      ]})}
+      ${intCard({icon:'🔔',title:'OneSignal',cat:'Push Bildirimler',desc:'Günlük burç hatırlatmaları. Backend cron job sabah push gönderir.',url:'https://app.onesignal.com',urlLabel:'app.onesignal.com',iconBg:'rgba(232,74,74,.12)',rows:[
+        {l:'Env Keys',v:'ONESIGNAL_APP_ID · API_KEY'},{l:'Kullanım',v:'iOS SDK + Backend API',badge:'int-badge-be'},{l:'Durum',v:'Aktif ✓',badge:'int-badge-ok'}
+      ]})}
+    </div>`;
+
+  const astro = `
+    <div class="arch-cat-title"><span class="ico">🪐</span> Astronomi & Hesaplama</div>
+    <div class="int-cards">
+      ${intCard({icon:'🪐',title:'Swiss Ephemeris',cat:'Gezegen Hesaplama',desc:'Profesyonel gezegen pozisyon kütüphanesi. 13 gezegen, 12 ev, aspektler.',url:'https://www.astro.com/swisseph/',urlLabel:'astro.com/swisseph',iconBg:'rgba(155,127,232,.12)',rows:[
+        {l:'Paket',v:'swisseph (npm)'},{l:'Kullanım',v:'Backend',badge:'int-badge-be'}
+      ]})}
+      ${intCard({icon:'☀️',title:'SunCalc',cat:'Güneş/Ay Pozisyonu',desc:'Güneş/Ay doğuş-batış saatleri, Ay fazı bilgisi.',url:'https://github.com/mourner/suncalc',urlLabel:'github.com/mourner/suncalc',iconBg:'rgba(232,146,74,.12)',rows:[
+        {l:'Paket',v:'suncalc (npm)'},{l:'Kullanım',v:'Backend',badge:'int-badge-be'}
+      ]})}
+      ${intCard({icon:'🌍',title:'geo-tz',cat:'Zaman Dilimi',desc:'Koordinatlardan zaman dilimi belirler. Doğum yeri → UTC hesaplama.',url:'https://github.com/evansiroky/timezone-boundary-builder',urlLabel:'github.com',iconBg:'rgba(6,182,212,.12)',rows:[
+        {l:'Paket',v:'geo-tz (npm)'},{l:'Kullanım',v:'Backend',badge:'int-badge-be'}
+      ]})}
+    </div>`;
+
+  const iosLibs = `
+    <div class="arch-cat-title"><span class="ico">📱</span> iOS Kütüphaneleri</div>
+    <div class="int-cards">
+      ${intCard({icon:'✨',title:'Lottie',cat:'Animasyon',desc:'After Effects animasyonlarını iOS\'ta çalıştırır. Yükleme, onboarding.',url:'https://github.com/airbnb/lottie-ios',urlLabel:'github.com/airbnb/lottie-ios',iconBg:'rgba(232,74,130,.12)',rows:[
+        {l:'Paket',v:'lottie-ios (SPM)'},{l:'Kullanım',v:'iOS',badge:'int-badge-ios'}
+      ]})}
+      ${intCard({icon:'⏰',title:'node-cron',cat:'Zamanlanmış Görevler',desc:'Günlük içgörü üretimi ve push gönderimi zamanlayıcısı.',url:'https://www.npmjs.com/package/node-cron',urlLabel:'npmjs.com/package/node-cron',iconBg:'rgba(6,182,212,.12)',rows:[
+        {l:'Paket',v:'node-cron (npm)'},{l:'Kullanım',v:'Backend',badge:'int-badge-be'}
+      ]})}
+    </div>`;
+
+  const web = `
+    <div class="arch-cat-title"><span class="ico">🌐</span> Web & E-posta</div>
+    <div class="int-cards">
+      ${intCard({icon:'🌐',title:'GitHub Pages',cat:'Web Hosting',desc:'shimal.app web sitesi. Gizlilik politikası, kullanım koşulları, tanıtım.',url:'https://github.com/hazarustun-spec/Shimal-Website',urlLabel:'github.com',iconBg:'rgba(155,127,232,.12)',rows:[
+        {l:'Domain',v:'shimal.app'},{l:'Sayfalar',v:'Ana sayfa · Privacy · Terms'},{l:'Durum',v:'Aktif ✓',badge:'int-badge-ok'}
+      ]})}
+      ${intCard({icon:'📧',title:'ImprovMX',cat:'E-posta Yönlendirme',desc:'hello@shimal.app → Gmail yönlendirme. MX + SPF DNS kayıtları.',url:'https://improvmx.com',urlLabel:'improvmx.com',iconBg:'rgba(232,146,74,.12)',rows:[
+        {l:'Adres',v:'hello@shimal.app'},{l:'DNS',v:'MX: mx1/mx2.improvmx.com'},{l:'Durum',v:'Aktif ✓',badge:'int-badge-ok'}
+      ]})}
+      ${intCard({icon:'🔤',title:'Google Fonts',cat:'Tipografi',desc:'Instrument Serif & Sans. Web\'de CDN, iOS\'ta bundle.',url:'https://fonts.google.com/?query=instrument',urlLabel:'fonts.google.com',iconBg:'rgba(232,74,130,.12)',rows:[
+        {l:'Fontlar',v:'Instrument Serif · Instrument Sans'},{l:'Kullanım',v:'Web + iOS',badge:'int-badge-web'}
+      ]})}
+    </div>`;
+
+  // Data flow
+  const flowSteps = [
+    {n:'1',icon:'📱',t:'Uygulama Açılır',d:'iOS başlatılır → OneSignal SDK init → RevenueCat SDK init → Session token kontrol'},
+    {n:'2',icon:'🔑',t:'Giriş (İlk Kez)',d:'Sign in with Apple → <code>identityToken</code> → Backend <code>POST /api/auth/apple</code> → JWT session token'},
+    {n:'3',icon:'🌟',t:'Onboarding',d:'Doğum tarihi, saati, yeri → <code>POST /api/user/profile</code> → Supabase → geo-tz zaman dilimi'},
+    {n:'4',icon:'🪐',t:'Natal Harita',d:'SwissEph ile gezegen pozisyonları → 13 gezegen, 12 ev, yükselen, aspektler → JSON'},
+    {n:'5',icon:'⏰',t:'Günlük İçgörü Üretimi',d:'<code>node-cron</code> sabah tetikler → Natal + transit → Claude AI → <code>daily_insights</code>'},
+    {n:'6',icon:'🔔',t:'Push Bildirim',d:'İçgörü üretimi bitti → OneSignal API → APNs → iPhone "Günlük burcun hazır!"'},
+    {n:'7',icon:'📖',t:'İçgörü Gösterimi',d:'<code>GET /api/daily</code> → Free: özet, Premium: detaylı analiz + sağlık + para'},
+    {n:'8',icon:'💰',t:'Premium Satın Alma',d:'"Premium\'a Geç" → RevenueCat → App Store ödeme → Makbuz doğrulama → Kilitsiz'},
+  ].map(s => `<div class="flow-s"><div class="flow-s-num">${s.n}</div><div><h4>${s.icon} ${s.t}</h4><p>${s.d}</p></div></div>`).join('');
+
+  const dataFlow = `
+    <div class="section">
+      <h2><span class="ico">🔄</span> Veri Akışı — Kullanıcı Ne Yaşar?</h2>
+      <div class="flow-steps">${flowSteps}</div>
+    </div>`;
+
+  // Env table
+  const envRows = [
+    ['ANTHROPIC_API_KEY','<span class="int-c-badge int-badge-be">Railway</span>','Claude AI içgörü üretimi','console.anthropic.com'],
+    ['SUPABASE_URL','<span class="int-c-badge int-badge-be">Railway</span>','Veritabanı bağlantı adresi','supabase.com → Settings'],
+    ['SUPABASE_SERVICE_KEY','<span class="int-c-badge int-badge-be">Railway</span>','Veritabanı erişim anahtarı','supabase.com → API'],
+    ['ONESIGNAL_APP_ID','<span class="int-c-badge int-badge-be">Railway</span> <span class="int-c-badge int-badge-ios">xcconfig</span>','Push bildirim uygulama ID','onesignal.com → Settings'],
+    ['ONESIGNAL_API_KEY','<span class="int-c-badge int-badge-be">Railway</span>','Push bildirim API anahtarı','onesignal.com → Keys'],
+    ['REVENUECAT_API_KEY','<span class="int-c-badge int-badge-ios">xcconfig</span>','Abonelik yönetimi iOS SDK','app.revenuecat.com → API Keys'],
+    ['SHIMAL_API_KEY','<span class="int-c-badge int-badge-be">Railway</span> <span class="int-c-badge int-badge-ios">xcconfig</span>','iOS ↔ Backend doğrulama','Kendi oluşturduğun key'],
+    ['JWT_SECRET','<span class="int-c-badge int-badge-be">Railway</span>','Session token şifreleme','Kendi oluşturduğun secret'],
+  ].map(r => `<tr><td><span class="env-n">${r[0]}</span></td><td>${r[1]}</td><td>${r[2]}</td><td style="color:var(--muted)">${r[3]}</td></tr>`).join('');
+
+  const envTable = `
+    <div class="section">
+      <h2><span class="ico">🔑</span> Environment Değişkenleri</h2>
+      <table class="env-tbl"><thead><tr><th>Değişken</th><th>Nerede</th><th>Ne İşe Yarar</th><th>Nereden Alınır</th></tr></thead><tbody>${envRows}</tbody></table>
+    </div>`;
+
+  // Git repos
+  const repos = [
+    {icon:'🚂',name:'shimal-backend',url:'https://github.com/hazarustun-spec/shimal-backend',desc:'Node.js/Express API. Claude AI, SwissEph, Supabase, cron. Railway deploy.',tags:['Node.js','Express','SwissEph','Supabase','Railway']},
+    {icon:'📱',name:'shimal-ios',url:'https://github.com/hazarustun-spec/shimal-ios',desc:'SwiftUI iOS uygulaması. MVVM, 66 dosya, ~15.200 satır.',tags:['SwiftUI','MVVM','RevenueCat','OneSignal','Lottie']},
+    {icon:'🌐',name:'Shimal-Website',url:'https://github.com/hazarustun-spec/Shimal-Website',desc:'shimal.app tanıtım, gizlilik, kullanım koşulları. GitHub Pages.',tags:['HTML/CSS','GitHub Pages','Custom Domain']},
+  ].map(r => {
+    const tags = r.tags.map(t => `<span style="font-size:10px;padding:2px 8px;border-radius:12px;background:rgba(201,168,76,.08);color:var(--muted);border:1px solid rgba(201,168,76,.12)">${t}</span>`).join(' ');
+    return `<a class="int-c" href="${r.url}" target="_blank" rel="noopener" style="flex:1;min-width:280px">
+      <div style="font-size:15px;font-weight:600;margin-bottom:3px">${r.icon} ${r.name}</div>
+      <div style="font-size:10px;color:var(--muted2);font-family:monospace;margin-bottom:8px;word-break:break-all">${r.url.replace('https://','')}</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.4">${r.desc}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${tags}</div>
+    </a>`;
+  }).join('');
+
+  const repoSection = `
+    <div class="section">
+      <h2><span class="ico">📂</span> Git Repoları</h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">${repos}</div>
+    </div>`;
+
+  // Checklist
+  const done = ['Backend deploy (Railway)','Supabase veritabanı','Sign in with Apple','RevenueCat abonelik','Paid Apps Agreement (Aktif)','App Store ürünleri','OneSignal push bildirimler','Natal harita (gerçek semboller)','hello@shimal.app e-posta','Gizlilik & Kullanım koşulları','Hesap silme özelliği','Tüm hata retry butonları'];
+  const todo = ['Sandbox abonelik testi','App Store ekran görüntüleri','App Store açıklama & anahtar kelimeler','Uygulama ikonu (1024x1024)','TestFlight beta testi','App Review\'a gönderim'];
+
+  const checklist = `
+    <div class="section">
+      <h2><span class="ico">🚀</span> App Store Yayın Durumu</h2>
+      <div class="checklist-cols">
+        <div class="cl-col"><h4 class="cl-done">✅ Tamamlandı</h4>${done.map(d => `<div class="cl-item"><span style="color:var(--green)">✓</span> ${d}</div>`).join('')}</div>
+        <div class="cl-col"><h4 class="cl-todo">⏳ Kalan Adımlar</h4>${todo.map(d => `<div class="cl-item"><span style="color:var(--accent)">○</span> ${d}</div>`).join('')}</div>
+      </div>
+    </div>`;
+
+  return `<div class="tab-panel" id="tab-architecture">
+    ${diagram}
+    <div class="section">
+      <h2><span class="ico">🔗</span> Tüm Entegrasyonlar</h2>
+      ${aiBackend}${payments}${auth}${astro}${iosLibs}${web}
+    </div>
+    ${dataFlow}
+    ${envTable}
+    ${repoSection}
+    ${checklist}
   </div>`;
 }
 
