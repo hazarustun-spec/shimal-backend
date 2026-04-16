@@ -341,6 +341,29 @@ function persistOtpLockout(identifier, entry) {
 // Startup'ta persistence'ı yükle (supabase modülü hazır olduktan sonra)
 setImmediate(() => { loadOtpLockoutsFromDb(); });
 
+// ─── Graceful shutdown: aktif lockout'ları DB'ye flush et ─────────────────────
+
+async function flushOtpLockoutsToDb() {
+  if (!_otpLockoutPersistAvailable) return;
+  const entries = [...otpLockouts.entries()];
+  if (entries.length === 0) return;
+  let flushed = 0;
+  for (const [identifier, entry] of entries) {
+    // Sadece aktif kilitleri veya failure'ı olanları flush et
+    if (entry.failures > 0 || (entry.lockedUntil && entry.lockedUntil > Date.now())) {
+      persistOtpLockout(identifier, entry);
+      flushed++;
+    }
+  }
+  if (flushed > 0) console.log(`[OTP] Shutdown: ${flushed} lockout kaydı DB'ye flush edildi`);
+}
+
+// Graceful shutdown hook — process.on('SIGTERM') index.js'ten çağrılır
+// Bu fonksiyon export edilir, index.js shutdown sırasında çağırır
+async function onShutdown() {
+  await flushOtpLockoutsToDb();
+}
+
 // ─── Ana kontrol fonksiyonu ───────────────────────────────────────────────────
 
 function checkRateLimit(req, res, pathname) {
@@ -359,4 +382,5 @@ module.exports = {
   checkOtpLockout,
   recordOtpFailure,
   clearOtpFailures,
+  onShutdown,
 };

@@ -127,9 +127,13 @@ async function routeRequest(req, res) {
   if (req.method === 'OPTIONS') {
     const url = getRequestUrl(req);
     if (url.pathname.startsWith('/dashboard/')) {
-      const allowedOrigin = process.env.DASHBOARD_ORIGIN || '*';
+      const dashboardOrigin = process.env.DASHBOARD_ORIGIN
+        || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null);
       const reqOrigin = req.headers.origin || '';
-      const corsOrigin = allowedOrigin === '*' ? '*' : (reqOrigin === allowedOrigin ? allowedOrigin : allowedOrigin);
+      // Production'da sadece tanımlı origin'e izin ver; local dev'de wildcard
+      const corsOrigin = dashboardOrigin
+        ? (reqOrigin === dashboardOrigin ? dashboardOrigin : dashboardOrigin)
+        : '*';
       res.writeHead(204, {
         'Access-Control-Allow-Origin': corsOrigin,
         'Access-Control-Allow-Headers': 'x-api-key, x-dashboard-token, content-type',
@@ -191,6 +195,28 @@ server.listen(PORT, () => {
   console.log(`📡 API docs at http://localhost:${PORT}/`);
   console.log(`🔮 Health check at http://localhost:${PORT}/health\n`);
 });
+
+// ─── Graceful shutdown ───────────────────────────────────────────────────────
+// Railway SIGTERM gönderir → aktif state'leri flush et, sonra kapat
+
+async function gracefulShutdown(signal) {
+  console.log(`[Shutdown] ${signal} alındı, state flush ediliyor...`);
+  try {
+    const { onShutdown: flushRateLimits } = require('./utils/rate-limit');
+    await flushRateLimits();
+  } catch (err) {
+    console.error('[Shutdown] Rate limit flush hatası:', err.message);
+  }
+  server.close(() => {
+    console.log('[Shutdown] Server kapatıldı.');
+    process.exit(0);
+  });
+  // 5 saniye içinde kapanmazsa zorla kapat
+  setTimeout(() => { process.exit(1); }, 5000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
 
 // ─── Cron jobs ────────────────────────────────────────────────────────────────
 // ─── Cron yardımcıları ────────────────────────────────────────────────────────

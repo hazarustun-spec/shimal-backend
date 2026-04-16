@@ -16,7 +16,11 @@ const supabase = require('../config/supabase');
 const { writeJson } = require('../utils/http');
 
 function dashboardCorsOrigin() {
-  return process.env.DASHBOARD_ORIGIN || '*';
+  // Production'da wildcard açık bırakmak güvenlik riski — env var yoksa
+  // backend URL'ini kullan (dashboard kendi origin'inde barındırılıyor)
+  return process.env.DASHBOARD_ORIGIN || process.env.RAILWAY_PUBLIC_DOMAIN
+    ? (process.env.DASHBOARD_ORIGIN || `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`)
+    : '*'; // Sadece local dev'de wildcard
 }
 
 // ─── Pricing ──────────────────────────────────────────────────────────────────

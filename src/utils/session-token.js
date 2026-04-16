@@ -57,6 +57,10 @@ function invalidateTokenCache(deviceId) {
   tokenCache.delete(deviceId);
 }
 
+// DB erişim hatası sayacı — sürekli hata varsa güvenlik uyarısı logla
+let _dbErrorCount = 0;
+const DB_ERROR_WARN_THRESHOLD = 5;
+
 async function getStoredTokenHash(deviceId) {
   const cached = tokenCache.get(deviceId);
   if (cached && (Date.now() - cached.cachedAt) < CACHE_TTL_MS) {
@@ -71,16 +75,29 @@ async function getStoredTokenHash(deviceId) {
       .maybeSingle();
 
     if (error) {
-      // DB hatası → cache'i kirletme, fail-open: legacy HMAC yoluna düş
-      console.warn('[SessionToken] DB lookup hatası:', error.message || error);
+      _dbErrorCount++;
+      console.warn(`[SessionToken] DB lookup hatası (${_dbErrorCount}x):`, error.message || error);
+      if (_dbErrorCount >= DB_ERROR_WARN_THRESHOLD) {
+        console.error('[SessionToken] ⚠️  DB sürekli erişilemiyor — legacy HMAC fallback aktif, güvenlik seviyesi düşük!');
+      }
       return undefined; // undefined = bilinmiyor, caller legacy fallback'e düşer
+    }
+
+    // DB erişimi başarılı → hata sayacını sıfırla
+    if (_dbErrorCount > 0) {
+      console.log(`[SessionToken] DB bağlantısı düzeldi (${_dbErrorCount} hata sonrası)`);
+      _dbErrorCount = 0;
     }
 
     const hash = data?.session_token_hash || null;
     tokenCache.set(deviceId, { hash, cachedAt: Date.now() });
     return hash;
   } catch (err) {
-    console.warn('[SessionToken] DB exception:', err.message || err);
+    _dbErrorCount++;
+    console.warn(`[SessionToken] DB exception (${_dbErrorCount}x):`, err.message || err);
+    if (_dbErrorCount >= DB_ERROR_WARN_THRESHOLD) {
+      console.error('[SessionToken] ⚠️  DB sürekli erişilemiyor — legacy HMAC fallback aktif, güvenlik seviyesi düşük!');
+    }
     return undefined;
   }
 }
@@ -100,8 +117,14 @@ async function verifyToken(deviceId, clientToken) {
   const storedHash = await getStoredTokenHash(deviceId);
 
   // DB erişilemez → legacy HMAC fallback (fail-open for availability)
+  // NOT: Bu, güvenlik seviyesini düşürür — DB düzeldiğinde otomatik olarak
+  //      random token doğrulamaya geri dönülür.
   if (storedHash === undefined) {
-    return verifyLegacyHmac(deviceId, clientToken) ? 'legacy' : false;
+    const legacyResult = verifyLegacyHmac(deviceId, clientToken);
+    if (legacyResult) {
+      console.warn(`[SessionToken] DB outage — ${deviceId.substring(0, 8)}... legacy HMAC ile doğrulandı`);
+    }
+    return legacyResult ? 'legacy' : false;
   }
 
   // DB'de hash var → random token doğrulama

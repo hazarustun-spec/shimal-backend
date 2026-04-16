@@ -197,7 +197,7 @@ async function handleDailyGet(req, res, params, url) {
     if (clientTz && typeof clientTz === 'string' && clientTz.length < 60 && clientTz !== user.timezone) {
       supabase.from('users').update({ timezone: clientTz }).eq('id', user.id)
         .then(() => console.log(`[Daily] Timezone güncellendi: ${user.id} → ${clientTz}`))
-        .catch(() => {}); // non-blocking, hata durumunda sessiz geç
+        .catch((err) => console.error(`[Daily] Timezone güncelleme hatası: ${user.id}`, err?.message)); // non-blocking ama logla
       user.timezone = clientTz; // in-memory güncelle (bu istek için geçerli)
     }
 

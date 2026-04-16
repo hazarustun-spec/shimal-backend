@@ -3,7 +3,7 @@
 const supabase = require('../config/supabase');
 const { buildNatalChart } = require('../services/natal-chart');
 const { readJsonBody, writeJson, badRequest, internalError, checkOwnership, checkCronKey } = require('../utils/http');
-const { issueNewToken } = require('../utils/session-token');
+const { issueNewToken, invalidateTokenCache } = require('../utils/session-token');
 const { isValidDeviceId, isValidBirthDate, isValidBirthTime, isValidText, isValidLatitude, isValidLongitude, isValidBirthPlace } = require('../utils/validate');
 
 const { toTR } = require('../utils/zodiac-tr');
@@ -188,9 +188,14 @@ async function handleUserDelete(req, res, params) {
       return;
     }
 
-    // Delete all related data for this user
-    await supabase.from('feedback').delete().eq('user_id', user.id);
-    await supabase.from('daily_insights').delete().eq('user_id', user.id);
+    // Token cache'i hemen temizle — silinen kullanıcının cached token'ı geçersiz olmalı
+    invalidateTokenCache(params.deviceId);
+
+    // Delete all related data for this user (hata kontrolü ile)
+    const { error: fbErr } = await supabase.from('feedback').delete().eq('user_id', user.id);
+    if (fbErr) console.error(`[User] feedback silme hatası: ${user.id}`, fbErr.message);
+    const { error: insErr } = await supabase.from('daily_insights').delete().eq('user_id', user.id);
+    if (insErr) console.error(`[User] insights silme hatası: ${user.id}`, insErr.message);
 
     // Delete the user record
     const { error: deleteError } = await supabase.from('users').delete().eq('id', user.id);
@@ -226,9 +231,14 @@ async function handleUserDeletePost(req, res) {
       return;
     }
 
-    // Delete all related data for this user
-    await supabase.from('feedback').delete().eq('user_id', user.id);
-    await supabase.from('daily_insights').delete().eq('user_id', user.id);
+    // Token cache'i hemen temizle — silinen kullanıcının cached token'ı geçersiz olmalı
+    invalidateTokenCache(deviceId);
+
+    // Delete all related data for this user (hata kontrolü ile)
+    const { error: fb2Err } = await supabase.from('feedback').delete().eq('user_id', user.id);
+    if (fb2Err) console.error(`[User] feedback silme hatası: ${user.id}`, fb2Err.message);
+    const { error: ins2Err } = await supabase.from('daily_insights').delete().eq('user_id', user.id);
+    if (ins2Err) console.error(`[User] insights silme hatası: ${user.id}`, ins2Err.message);
     const { error: deleteError } = await supabase.from('users').delete().eq('id', user.id);
 
     if (deleteError) throw deleteError;

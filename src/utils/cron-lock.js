@@ -32,13 +32,21 @@ function headers() {
   };
 }
 
+// Lock durumu takibi — tablo yoksa veya DB erişilemezse startup'ta uyar
+let _lockTableVerified = false;
+let _lockTableMissing = false;
+
 /**
  * Kilit almayı dener. Başarılıysa true, aksi halde false döner.
- * DB hatası → true döner (fail-open: tek instance'ta çalışmayı bozmamak için).
+ *
+ * Strateji:
+ *   - DB hatası + tek instance ortamı → true (fail-open, logla)
+ *   - Tablo yoksa → her çağrıda WARN logla (dikkat çeksin)
+ *   - Supabase env eksikse → true + uyarı
  */
 async function acquireCronLock(jobName, ttlSeconds) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    console.warn(`[CronLock] Supabase env eksik, ${jobName} kilitsiz çalışıyor`);
+    console.warn(`[CronLock] ⚠️  Supabase env eksik, ${jobName} kilitsiz çalışıyor — çoklu instance riski!`);
     return true;
   }
   try {
@@ -63,21 +71,63 @@ async function acquireCronLock(jobName, ttlSeconds) {
     });
 
     if (res.status === 201 || res.status === 200) {
+      _lockTableVerified = true;
       return true;
     }
     if (res.status === 409) {
       // Başka instance aktif kilit tutuyor
+      _lockTableVerified = true;
       return false;
     }
-    // Tablo yoksa (42P01) veya başka DB hatası → fail-open, logla
+
+    // Tablo yoksa (42P01) veya başka DB hatası
     const text = await res.text().catch(() => '');
-    console.warn(`[CronLock] ${jobName} INSERT hatası (${res.status}): ${text.substring(0, 200)}`);
-    return true;
+
+    // 42P01 = tablo bulunamadı → migration gerekiyor
+    if (text.includes('42P01') || text.includes('cron_locks')) {
+      if (!_lockTableMissing) {
+        console.error(`[CronLock] ❌ cron_locks tablosu bulunamadı! Migration çalıştırın: backend/sql/002_cron_locks.sql`);
+        console.error(`[CronLock] ⚠️  Çoklu instance'da duplicate job riski var — ${jobName} kilitsiz çalışacak`);
+        _lockTableMissing = true;
+      }
+    } else {
+      console.warn(`[CronLock] ${jobName} INSERT hatası (${res.status}): ${text.substring(0, 200)}`);
+    }
+    return true; // Fail-open — tek instance'ta çalışmayı bozmamak için
   } catch (err) {
     console.warn(`[CronLock] ${jobName} acquire exception:`, err.message || err);
     return true; // Fail-open
   }
 }
+
+/**
+ * Startup'ta cron_locks tablosunun varlığını kontrol eder.
+ * Hata oluşursa uyarı loglar ama process'i durdurmaz.
+ */
+async function verifyCronLockTable() {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/cron_locks?select=job_name&limit=0`,
+      { method: 'GET', headers: headers() }
+    );
+    if (res.ok) {
+      _lockTableVerified = true;
+      console.log('[CronLock] ✓ cron_locks tablosu doğrulandı');
+    } else {
+      const text = await res.text().catch(() => '');
+      if (text.includes('42P01') || res.status === 404) {
+        _lockTableMissing = true;
+        console.error('[CronLock] ❌ cron_locks tablosu bulunamadı — backend/sql/002_cron_locks.sql çalıştırın!');
+      }
+    }
+  } catch (err) {
+    console.warn('[CronLock] Tablo kontrolü hatası:', err.message);
+  }
+}
+
+// Startup'ta kontrol (non-blocking)
+setImmediate(() => { verifyCronLockTable(); });
 
 /**
  * Kilidi serbest bırakır (job bittiğinde çağrılır).
@@ -113,4 +163,4 @@ async function withCronLock(jobName, ttlSeconds, fn) {
   return true;
 }
 
-module.exports = { acquireCronLock, releaseCronLock, withCronLock, INSTANCE_ID };
+module.exports = { acquireCronLock, releaseCronLock, withCronLock, verifyCronLockTable, INSTANCE_ID };
