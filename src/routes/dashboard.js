@@ -25,15 +25,14 @@ function dashboardCorsOrigin() {
 
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 const PRICING = {
-  'claude-opus-4-6':   { input: 15.00, output: 75.00 },
-  'claude-sonnet-4-6': { input: 3.00,  output: 15.00 },
-  'claude-sonnet-4-5': { input: 3.00,  output: 15.00 },
-  'claude-haiku-4-5':  { input: 0.80,  output: 4.00  },
-  'claude-3-5-sonnet': { input: 3.00,  output: 15.00 },
-  'claude-3-5-haiku':  { input: 0.80,  output: 4.00  },
-  'claude-3-opus':     { input: 15.00, output: 75.00 },
-  'claude-3-haiku':    { input: 0.25,  output: 1.25  },
-  default:             { input: 3.00,  output: 15.00 },
+  // Gemini (current engine). Verify against ai.google.dev/pricing — rates change.
+  'gemini-2.5-flash-lite': { input: 0.10, output: 0.40 },
+  'gemini-2.5-flash':      { input: 0.30, output: 2.50 },
+  'gemini-2.5-pro':        { input: 1.25, output: 10.00 },
+  // Legacy Claude rates (kept for historical cost rows)
+  'claude-sonnet-4-6':     { input: 3.00,  output: 15.00 },
+  'claude-haiku-4-5':      { input: 0.80,  output: 4.00  },
+  default:                 { input: 0.30,  output: 2.50 },
 };
 
 function calcCost(model, inp, out) {
@@ -153,26 +152,21 @@ async function getHealthCheck() {
     }
   } catch { dbOk = false; }
 
-  // Anthropic API reachability check — zero-cost HEAD-style probe
-  // POST with empty body → 400 (bad request) proves API is reachable without spending tokens
+  // Gemini API reachability check — zero-cost model-metadata GET (no tokens spent)
   let anthropicOk = false;
   let anthropicLatencyMs = null;
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     if (apiKey) {
       const t0 = Date.now();
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
-        body: '{}', // Intentionally invalid → 400 = reachable, no tokens spent
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}`, {
+        method: 'GET',
+        headers: { 'x-goog-api-key': apiKey },
         signal: AbortSignal.timeout(5000),
       });
       anthropicLatencyMs = Date.now() - t0;
-      // 400 = bad request (API reachable), 401 = bad key, 5xx = down
+      // 200 = reachable + valid key, 400/401/403 = reachable (bad key), 5xx = down
       anthropicOk = r.status < 500;
     }
   } catch { anthropicOk = false; }
@@ -374,7 +368,7 @@ async function getAnthropicUsage() {
 
     const dp = USAGE_PROFILES.daily;
     const pp = USAGE_PROFILES.personality;
-    const model = 'claude-sonnet-4-6';
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
     const totalInp = insightCount * dp.inp + personalityCount * pp.inp;
     const totalOut = insightCount * dp.out + personalityCount * pp.out;

@@ -146,6 +146,13 @@ async function getUserByDeviceId(deviceId) {
   return user;
 }
 
+// Kayıtlı içgörü premium (3 paragraf) mı yoksa free (2 paragraf) mı üretilmiş?
+// Free kullanıcı gün içinde premium'a geçtiğinde bunu tespit edip tam yeniden üretmek için.
+function insightHasPremiumParagraph(row) {
+  const detail = row?.love?.detail || '';
+  return detail.split(/\n\n+/).filter((p) => p.trim()).length >= 3;
+}
+
 function applyPremiumGate(response, isPremium) {
   if (isPremium) return { ...response, is_premium: true };
 
@@ -161,7 +168,9 @@ function applyPremiumGate(response, isPremium) {
     return {
       ...section,
       detail: freeDetail,
-      has_premium_content: paragraphs.length >= 3,
+      // Free için 3. paragraf artık üretilmiyor (maliyet). Ama premium katmanı GERÇEKTEN
+      // daha derin kişisel yorum sunuyor → upsell CTA'sı her zaman gösterilsin.
+      has_premium_content: true,
     };
   };
 
@@ -208,7 +217,14 @@ async function handleDailyGet(req, res, params, url) {
       .eq('date', today)
       .single();
 
-    if (existing) {
+    // Free kullanıcı gün içinde premium'a geçtiyse kayıtlı içgörü 2 paragraf (free üretilmiş).
+    // Tam premium içgörüyü o an yeniden üret (lazy) — aşağıdaki üretim yolu mevcut satırı günceller.
+    const needsPremiumRegen = !!(existing && user.is_premium && !insightHasPremiumParagraph(existing));
+    if (needsPremiumRegen) {
+      console.log(`[Daily] Premium yükseltme algılandı — bugünün içgörüsü tam yeniden üretiliyor: ${user.id}`);
+    }
+
+    if (existing && !needsPremiumRegen) {
       writeJson(res, 200, applyPremiumGate({
         date: today,
         sunSign: toTR(user.sun_sign),
@@ -259,6 +275,7 @@ async function handleDailyGet(req, res, params, url) {
         birthPlace:         user.birth_place || null,
         yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
         feedbackSummary,
+        isPremium:          !!user.is_premium,
       });
     } catch (aiError) {
       console.error(`[Daily] AI generation failed, using fallback. Error: ${aiError.message}\nStack: ${aiError.stack}`);
@@ -269,26 +286,26 @@ async function handleDailyGet(req, res, params, url) {
     // Only save to Supabase if AI actually generated content (not fallback)
     // This way, next app open will retry AI instead of serving stale fallback
     if (!insight._isFallback) {
-      const { error: insertError } = await supabase
-        .from('daily_insights')
-        .insert({
-          user_id: user.id,
-          date: today,
-          love: insight.love,
-          career: insight.career,
-          energy: insight.energy,
-          health: insight.health || null,
-          money: insight.money || null,
-          daily_focus: insight.daily_focus,
-          notification_text: insight.notification,
-          transits_used: {
-            retrogrades: transitData.retrogrades,
-            topAspects: transitData.aspects.slice(0, 5),
-          },
-        });
+      const payload = {
+        love: insight.love,
+        career: insight.career,
+        energy: insight.energy,
+        health: insight.health || null,
+        money: insight.money || null,
+        daily_focus: insight.daily_focus,
+        notification_text: insight.notification,
+        transits_used: {
+          retrogrades: transitData.retrogrades,
+          topAspects: transitData.aspects.slice(0, 5),
+        },
+      };
+      // existing varsa premium-regen durumu → mevcut satırı GÜNCELLE (yeni satır ekleme, çift kayıt olmasın)
+      const { error: saveError } = existing
+        ? await supabase.from('daily_insights').update(payload).eq('id', existing.id)
+        : await supabase.from('daily_insights').insert({ user_id: user.id, date: today, ...payload });
 
-      if (insertError) {
-        console.error('[Daily] Insert error:', insertError.message);
+      if (saveError) {
+        console.error('[Daily] Kaydetme hatası:', saveError.message);
       }
     } else {
       console.log('[Daily] Fallback served — NOT saving to DB so next request retries AI');
@@ -396,6 +413,7 @@ async function handleDailyGenerateAll(req, res, _params, url) {
           preferredName:      user.preferred_name || '',
           birthPlace:         user.birth_place || null,
           yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
+          isPremium:          !!user.is_premium,
         });
 
         await supabase.from('daily_insights').insert({
@@ -474,6 +492,7 @@ async function generateInsightForUser(user, today) {
     birthPlace:         user.birth_place || null,
     yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
     feedbackSummary,
+    isPremium:          !!user.is_premium,
   });
 
   await supabase.from('daily_insights').insert({

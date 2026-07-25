@@ -1,25 +1,55 @@
 services:
   - type: web
-    name: astroguide-backend
+    name: shimal-backend
     runtime: node
-    region: fra
-    plan: free
+    region: frankfurt
+    # NOT free: push cron her dakika, insight cron 03:00'te çalışıyor.
+    # Render free plan 15dk boşta kalınca uykuya geçer → günlük bildirim ölür.
+    plan: starter
     buildCommand: npm install
     startCommand: node src/index.js
+    # /health DEĞİL: handleHealth, Supabase'e ulaşamazsa 503 döner. Render bunu
+    # unhealthy sayıp servisi yeniden başlatır → geçici bir DB hıçkırığı kendi
+    # kendine outage'a dönüşür. '/' her zaman 200 döner ve süreç canlı mı onu ölçer.
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
+      # swisseph native modülü yeni Node sürümlerinde derlenemiyor ve ephemeris
+      # sessizce fallback hesaplamaya düşüyor. Node 20 LTS'e sabitle.
+      - key: NODE_VERSION
+        value: "20"
       - key: PORT
         value: "10000"
+      # --- Zorunlu: bunlar yoksa process.exit(1) ---
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
+      # --- iOS istemci kimlik doğrulama (Release.xcconfig ile AYNI olmalı) ---
+      - key: SHIMAL_API_KEY
+        sync: false
+      # --- Push ---
       - key: ONESIGNAL_APP_ID
         sync: false
       - key: ONESIGNAL_API_KEY
         sync: false
+      # --- Cron endpoint koruması ---
       - key: CRON_API_KEY
+        sync: false
+      # --- Abonelik webhook doğrulama ---
+      - key: REVENUECAT_WEBHOOK_SECRET
+        sync: false
+      # --- Admin dashboard: Railway'de RAILWAY_PUBLIC_DOMAIN'den türetiliyordu,
+      #     Render'da o değişken yok → servis URL'ini elle gir. ---
+      - key: DASHBOARD_ORIGIN
+        sync: false
+      - key: DASHBOARD_PASSWORD_HASH
+        sync: false
+      - key: DASHBOARD_SECRET
+        sync: false
+      # --- Opsiyonel: crash reporting ---
+      - key: SENTRY_DSN
         sync: false

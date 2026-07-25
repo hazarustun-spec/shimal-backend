@@ -1,5 +1,6 @@
 const { toTR } = require('../utils/zodiac-tr');
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const { sanitizeForAI } = require('../utils/validate');
 
 const SYSTEM_PROMPT = `Sen Shimal'ın astroloji yorum motorusun. Kişiye özel, samimi ve merak uyandıran günlük burç yorumları üretiyorsun.
@@ -197,36 +198,59 @@ function parseJSONResponse(text) {
   }
 }
 
-async function createAnthropicMessage({ system, userPrompt, maxTokens, temperature }) {
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY is missing');
+async function createGeminiMessage({ system, userPrompt, maxTokens, temperature }) {
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is missing');
   }
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
+      'x-goog-api-key': GEMINI_API_KEY,
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: maxTokens,
-      temperature,
-      system,
-      messages: [{ role: 'user', content: userPrompt }],
+      // System prompt is identical on every call → auto implicit-cached on Gemini 2.5 (input savings).
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        temperature,
+        maxOutputTokens: maxTokens,
+        // Guarantees syntactically valid JSON output.
+        responseMimeType: 'application/json',
+        // Flash reasons by default and bills those tokens as output. This is
+        // structured JSON generation, not a reasoning task → disable to cut cost + latency.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+      // Emotional / relationship astrology text is benign; prevent false-positive safety blocks.
+      safetySettings: [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      ],
     }),
   });
 
   const payload = await response.json();
 
   if (!response.ok) {
-    throw new Error(payload?.error?.message || 'Anthropic request failed');
+    throw new Error(payload?.error?.message || 'Gemini request failed');
   }
 
-  const text = payload?.content?.[0]?.text;
+  const candidate = payload?.candidates?.[0];
+  const text = candidate?.content?.parts?.map((p) => p.text).filter(Boolean).join('');
+
   if (!text) {
-    throw new Error('Anthropic response did not include text content');
+    const blockReason = payload?.promptFeedback?.blockReason;
+    const finishReason = candidate?.finishReason;
+    throw new Error(
+      blockReason
+        ? `Gemini blocked prompt: ${blockReason}`
+        : `Gemini response had no text (finishReason: ${finishReason || 'unknown'})`
+    );
   }
 
   return text.trim();
@@ -320,6 +344,7 @@ async function generateDailyInsight({
   birthPlace,
   yesterdayFocus,
   feedbackSummary,
+  isPremium = true, // default true → an accidental omission never degrades a paying user
 }) {
   // Sanitize user-controlled fields before injecting into AI prompt
   const safeName = sanitizeForAI(preferredName, 50);
@@ -375,8 +400,21 @@ async function generateDailyInsight({
 
   const safeBirthPlace = birthPlace ? sanitizeForAI(birthPlace, 100) : null;
 
-  const userPrompt = `Bu kişi için bugünün kişiselleştirilmiş astroloji içgörüsünü oluştur.
+  // Free users never see the premium 3rd paragraph — don't generate it (saves ~1/3 output cost).
+  const freeTierOverride = isPremium
+    ? ''
+    : `⚠️ BU KULLANICI ÜCRETSİZ (FREE) — ÇOK ÖNEMLİ:
+Her bölümün "detail" alanında SADECE 2 PARAGRAF üret (P1 + P2, \\n\\n ile ayrılmış).
+3. PREMIUM paragrafı KESİNLİKLE ÜRETME. Sistem talimatındaki "3 paragraf" kuralı bu kullanıcı için GEÇERSİZ — 2 paragraf yaz.
+daily_focus.detail de SADECE 2 PARAGRAF olsun.
+`;
 
+  const paragraphReminder = isPremium
+    ? 'ÖNEMLİ HATIRLATMA: 3 paragrafı \\n\\n ile ayır. İlk 2 paragraf kendi başına tatmin edici olmalı. 3. paragraf natal haritaya dayalı derin kişisel içgörü olmalı.'
+    : 'ÖNEMLİ HATIRLATMA: Her "detail" SADECE 2 PARAGRAF (\\n\\n ile ayrılmış) olsun. Premium 3. paragrafı ÜRETME. İki paragraf tek başına tatmin edici olmalı.';
+
+  const userPrompt = `Bu kişi için bugünün kişiselleştirilmiş astroloji içgörüsünü oluştur.
+${freeTierOverride}
 KİŞİ:
 - Güneş burcu: ${sunSignTR}
 - Ay burcu: ${moonSignTR || 'Belirtilmemiş'}
@@ -398,16 +436,16 @@ ${natalSummary}
 BUGÜNÜN TRANSİTLERİ VE NATAL HARİTAYA OLAN AÇILAR:
 ${transitSummary}
 ${yesterdayLine}${feedbackLine}
-ÖNEMLİ HATIRLATMA: 3 paragrafı \\n\\n ile ayır. İlk 2 paragraf kendi başına tatmin edici olmalı. 3. paragraf natal haritaya dayalı derin kişisel içgörü olmalı. Toplam mesajda en fazla 2-3 cümle zorluk/risk olsun, geri kalanı pozitif ve motive edici olsun. Spesifik saat verme, klişe kalıpları tekrarlama.
+${paragraphReminder} Toplam mesajda en fazla 2-3 cümle zorluk/risk olsun, geri kalanı pozitif ve motive edici olsun. Spesifik saat verme, klişe kalıpları tekrarlama.
 
 Yalnızca yukarıdaki gerçek astronomik verileri kullanarak JSON içgörüsünü oluştur.`;
 
   return withRetry(async () => {
     const text = await withTimeout(
-      createAnthropicMessage({
+      createGeminiMessage({
         system: SYSTEM_PROMPT,
         userPrompt,
-        maxTokens: 3500,
+        maxTokens: 4096, // headroom over old 3500 — Gemini tokenizer differs; avoid mid-JSON truncation
         temperature: 0.7,
       }),
       AI_TIMEOUT_MS
@@ -518,10 +556,10 @@ Bu kişinin haritasındaki HER gezegen için en az 10 cümlelik derin, kişiye �
   const PERSONALITY_TIMEOUT_MS = 300000; // 5 minutes — personality is a large one-time generation
   return withRetry(async () => {
     const text = await withTimeout(
-      createAnthropicMessage({
+      createGeminiMessage({
         system: PERSONALITY_SYSTEM_PROMPT,
         userPrompt,
-        maxTokens: 12000,
+        maxTokens: 16000, // headroom — 12-planet analysis is large; avoid truncation on Gemini tokenizer
         temperature: 0.7,
       }),
       PERSONALITY_TIMEOUT_MS
