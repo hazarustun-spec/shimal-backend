@@ -1,6 +1,18 @@
 const { toTR } = require('../utils/zodiac-tr');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// gemini-2.5-flash yeni API key'lerine kapatıldı ("no longer available to new
+// users" → 404). 3.x ailesi düşünmeyi kapatmaya izin vermiyor; ayrıntı için
+// createGeminiMessage içindeki nota bak.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+
+// Gemini 3.x düşünme token'larını maxOutputTokens bütçesinden yiyor ve düşünme
+// kapatılamıyor. Ölçüm: 66 token'lık bir cevap için 452 düşünme token'ı harcandı.
+// Çağıranlar hâlâ "istediğim cevap ne kadar olsun" diye bütçe veriyor; gerçek
+// istek bütçesi bu katsayıyla büyütülüyor. Env ile ayarlanabilir.
+const THINKING_HEADROOM = Number(process.env.GEMINI_THINKING_HEADROOM) || 3;
+
+// gemini-3.6-flash outputTokenLimit. Headroom çarpımı bunu aşarsa API 400 döner.
+const GEMINI_OUTPUT_LIMIT = 65536;
 const { sanitizeForAI } = require('../utils/validate');
 
 const SYSTEM_PROMPT = `Sen Shimal'ın astroloji yorum motorusun. Kişiye özel, samimi ve merak uyandıran günlük burç yorumları üretiyorsun.
@@ -212,17 +224,22 @@ async function createGeminiMessage({ system, userPrompt, maxTokens, temperature 
       'x-goog-api-key': GEMINI_API_KEY,
     },
     body: JSON.stringify({
-      // System prompt is identical on every call → auto implicit-cached on Gemini 2.5 (input savings).
+      // System prompt is identical on every call → auto implicit-cached (input savings).
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
       generationConfig: {
         temperature,
-        maxOutputTokens: maxTokens,
+        // maxOutputTokens düşünme token'larını DA kapsıyor. Gemini 3.x'te
+        // düşünme kapatılamadığı için çağıranların verdiği bütçe burada
+        // THINKING_HEADROOM ile çarpılıyor — aksi halde model bütçeyi
+        // düşünmeye harcayıp finishReason: MAX_TOKENS ile JSON'u yarıda kesiyor.
+        maxOutputTokens: Math.min(Math.ceil(maxTokens * THINKING_HEADROOM), GEMINI_OUTPUT_LIMIT),
         // Guarantees syntactically valid JSON output.
         responseMimeType: 'application/json',
-        // Flash reasons by default and bills those tokens as output. This is
-        // structured JSON generation, not a reasoning task → disable to cut cost + latency.
-        thinkingConfig: { thinkingBudget: 0 },
+        // thinkingConfig GÖNDERİLMİYOR. Gemini 3.x `thinkingBudget: 0` için
+        // 400 INVALID_ARGUMENT döndürüyor; `thinkingLevel` / `thinking_level`
+        // ise v1beta'da da v1alpha'da da tanınmıyor ("Cannot find field").
+        // Yani düşünmeyi kapatmanın bir yolu yok — bütçeyi büyütüp yaşıyoruz.
       },
       // Emotional / relationship astrology text is benign; prevent false-positive safety blocks.
       safetySettings: [
@@ -242,6 +259,18 @@ async function createGeminiMessage({ system, userPrompt, maxTokens, temperature 
 
   const candidate = payload?.candidates?.[0];
   const text = candidate?.content?.parts?.map((p) => p.text).filter(Boolean).join('');
+
+  // safeJsonParse kırpılmış JSON'u sessizce onarıyor, yani MAX_TOKENS tek başına
+  // hataya dönüşmüyor — yarım cümlelik bir içgörü üretiliyor. Loglanmazsa fark
+  // edilmez; görülürse THINKING_HEADROOM artırılmalı.
+  if (candidate?.finishReason === 'MAX_TOKENS') {
+    const u = payload?.usageMetadata || {};
+    console.warn(
+      `[Gemini] Çıktı kırpıldı (MAX_TOKENS). model=${GEMINI_MODEL} ` +
+      `düşünme=${u.thoughtsTokenCount ?? '?'} cevap=${u.candidatesTokenCount ?? '?'} ` +
+      `bütçe=${Math.min(Math.ceil(maxTokens * THINKING_HEADROOM), GEMINI_OUTPUT_LIMIT)}`
+    );
+  }
 
   if (!text) {
     const blockReason = payload?.promptFeedback?.blockReason;
