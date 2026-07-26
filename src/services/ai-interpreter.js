@@ -525,6 +525,28 @@ YAZIM TARZI:
 - Gezegen burç ve ev kombinasyonunu birlikte yorumla.
 - Retrograd gezegenler varsa etkisini özellikle belirt.
 
+ASLA DERS KİTABI GİBİ YAZMA — EN ÖNEMLİ KURAL:
+Yerleşimi tarif ederek başlama. Doğrudan kişiyi anlat. Okuyan kişi astroloji
+dersi değil, kendi hayatını okuduğunu hissetmeli.
+
+- YASAK AÇILIŞ KALIPLARI: "X'in Y evde yer alması ... gösterir", "Bu yerleşim
+  ... anlamına gelir", "... olduğunu işaret eder", "temel kimliğini oluşturur".
+- Burcun sembolünü imgeye çevir: Yay okçudur, Akrep derinlere dalar, Boğa
+  kök salar. Bu imgeyi cümlenin içine doğal olarak ör.
+- Somut hayat alanı adlandır: kardeşler, komşular, iş arkadaşları, yazmak,
+  yolculuk, para, uyku. Soyut "enerji"/"potansiyel" dili yerine bunları kullan.
+- En az bir cümlede kişinin gerçek hayatta yapabileceği somut bir şey söyle
+  ("Yazma yeteneğin güçlü olabilir, özellikle felsefi konularda" gibi).
+
+İYİ: "Sen kelimelerin gücüne inanan, düşüncelerini ok gibi hedefine fırlatan bir
+hikâye anlatıcısısın. Kardeşlerinle veya yakın çevrenle ilişkilerin sıra dışı —
+belki de onlara rehberlik eden konumdasın. Kısa yolculuklar seni heyecanlandırıyor,
+çünkü her yeni yer yeni bir perspektif demek."
+
+KÖTÜ: "Güneşinin üçüncü evde yer alması, iletişim kurma biçiminin temel kimliğini
+oluşturduğunu gösterir. Sen, bilgiyi yaymayı bir yaşam amacı haline getirmiş
+birisin. Zihninin hızı, çevrendeki olayları kavrama biçimini doğrudan etkiler."
+
 HER GEZEGEN İÇİN YORUM KURALLARI:
 
 ☉ GÜNEŞ: Temel kimlik, irade, yaşam amacı, ego yapısı, liderlik tarzı, kendini ifade biçimi.
@@ -540,8 +562,8 @@ HER GEZEGEN İÇİN YORUM KURALLARI:
 ☊ KUZEY DÜĞÜM: Ruhsal büyüme yönü, karmik amaç, bu hayatta öğrenmesi gereken ders.
 ⚷ CHIRON: En derin yara, iyileştirme potansiyeli, başkalarına yardım gücü.
 
-GÜÇLÜ YÖNLER: Natal açılardan ve gezegen yerleşimlerinden 5-7 somut güçlü yön çıkar. Soyut değil, pratik ve gerçek hayata dokunan.
-GİZLİ ÖZELLİKLER: Kişinin farkında olmadığı ama haritasında açıkça görünen 5-7 özellik. Sürpriz etkisi yaratsın.
+GÜÇLÜ YÖNLER: Natal açılardan ve gezegen yerleşimlerinden TAM 7 somut güçlü yön çıkar. Soyut değil, pratik ve gerçek hayata dokunan.
+GİZLİ ÖZELLİKLER: Kişinin farkında olmadığı ama haritasında açıkça görünen TAM 7 özellik. Sürpriz etkisi yaratsın.
 
 EV SİSTEMİ: Gezegen hangi evdeyse, o evin temasını yoruma yansıt:
 1. ev: Kimlik | 2. ev: Değerler/para | 3. ev: İletişim | 4. ev: Ev/aile
@@ -589,8 +611,8 @@ ${rows}
 const PROFILE_CHUNK_FORMAT = `ÇIKTI FORMATI — Yalnızca geçerli JSON döndür. Gezegen yorumu YAZMA:
 {
   "summary": "4-5 cümle genel kişilik profili. Kim olduğunu, nasıl hissettirdiğini, hayata nasıl yaklaştığını özetle.",
-  "strengths": ["somut güçlü yön 1 (1-2 cümle açıklama)", "...", "...en az 5 madde"],
-  "hiddenTraits": ["gizli özellik 1 (1-2 cümle açıklama)", "...", "...en az 5 madde"]
+  "strengths": ["somut güçlü yön 1 (1-2 cümle açıklama)", "...", "...TAM 7 madde"],
+  "hiddenTraits": ["gizli özellik 1 (1-2 cümle açıklama)", "...", "...TAM 7 madde"]
 }`;
 
 /**
