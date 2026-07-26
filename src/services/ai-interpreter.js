@@ -1,17 +1,29 @@
 const { toTR } = require('../utils/zodiac-tr');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-// gemini-2.5-flash yeni API key'lerine kapatıldı ("no longer available to new
-// users" → 404). 3.x ailesi düşünmeyi kapatmaya izin vermiyor; ayrıntı için
-// createGeminiMessage içindeki nota bak.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+// gemini-2.5-flash ve -flash-lite yeni API key'lerine kapatıldı ("no longer
+// available to new users" → 404).
+//
+// Model seçimi ölçümle yapıldı (aynı günlük içgörü prompt'u, 3291 token girdi):
+//
+//   model                  düşünme  cevap  süre    maliyet/içgörü
+//   gemini-3.6-flash          2737   1693  23.0s   $0.0382
+//   gemini-3-flash-preview    1531   1812  20.5s   $0.0071
+//   gemini-3.1-flash-lite        0   1901  10.0s   $0.0037  ← seçilen
+//   gemini-3.5-flash-lite        0   1948   9.1s   $0.0059
+//
+// "flash" modelleri düşünmeyi KAPATMAYA İZİN VERMİYOR (aşağıdaki nota bak) ve
+// düşünme token'ları çıktı olarak faturalanıyor → 10 kat maliyet. Lite modeller
+// zaten düşünmüyor. Kalite karşılaştırmasında lite, transit/natal verisini daha
+// somut kullandığı için ayrıca geri adım değil.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
 
-// Gemini 3.x düşünme token'larını maxOutputTokens bütçesinden yiyor ve düşünme
-// kapatılamıyor. Ölçüm: 66 token'lık bir cevap için 452 düşünme token'ı harcandı.
-// Çağıranlar hâlâ "istediğim cevap ne kadar olsun" diye bütçe veriyor; gerçek
-// istek bütçesi bu katsayıyla büyütülüyor. Env ile ayarlanabilir.
+// Lite modellerde düşünme sıfır, ama GEMINI_MODEL bir "flash" modeline
+// çevrilirse düşünme token'ları maxOutputTokens bütçesinden yenir ve cevap
+// yarıda kesilir. Bu katsayı o durumda emniyet payı bırakır; faturalama gerçek
+// token'lar üzerinden olduğu için lite kullanırken maliyeti etkilemez.
 const THINKING_HEADROOM = Number(process.env.GEMINI_THINKING_HEADROOM) || 3;
 
-// gemini-3.6-flash outputTokenLimit. Headroom çarpımı bunu aşarsa API 400 döner.
+// Gemini 3.x outputTokenLimit. Headroom çarpımı bunu aşarsa API 400 döner.
 const GEMINI_OUTPUT_LIMIT = 65536;
 const { sanitizeForAI } = require('../utils/validate');
 
