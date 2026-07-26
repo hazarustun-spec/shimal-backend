@@ -23,7 +23,7 @@ if (process.env.SENTRY_DSN) {
 const REQUIRED_ENV_VARS = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_KEY',
-  'ANTHROPIC_API_KEY',
+  'GEMINI_API_KEY',
 ];
 const missingVars = REQUIRED_ENV_VARS.filter((k) => !process.env[k]);
 if (missingVars.length > 0) {
@@ -94,8 +94,8 @@ async function handleHealth(_req, res) {
     health.status = 'degraded';
   }
 
-  health.anthropic = process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing';
-  if (!process.env.ANTHROPIC_API_KEY) health.status = 'degraded';
+  health.gemini = process.env.GEMINI_API_KEY ? 'configured' : 'missing';
+  if (!process.env.GEMINI_API_KEY) health.status = 'degraded';
 
   writeJson(res, health.status === 'ok' ? 200 : 503, health);
 }
