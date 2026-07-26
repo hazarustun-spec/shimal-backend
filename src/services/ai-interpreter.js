@@ -511,7 +511,7 @@ Yalnızca yukarıdaki gerçek astronomik verileri kullanarak JSON içgörüsün�
 
 // ─── Personality Analysis ────────────────────────────────────────────────────
 
-const PERSONALITY_SYSTEM_PROMPT = `Sen Shimal'ın kişilik analizi motorusun. Kişinin doğum haritasına dayalı derin, detaylı ve kişiye özel bir kişilik profili oluşturuyorsun.
+const PERSONALITY_RULES = `Sen Shimal'ın kişilik analizi motorusun. Kişinin doğum haritasına dayalı derin, detaylı ve kişiye özel bir kişilik profili oluşturuyorsun.
 
 DİL: Yanıtındaki HER kelime Türkçe olmalı. İngilizce kelime KULLANMA. Kesinlikle Korece, Japonca, Çince veya başka alfabe karakterleri kullanma — yalnızca Türk alfabesi (A-Z + Ğ Ü Ş İ Ö Ç). "때로" yerine "bazen", "zaman zaman" kullan.
 BURÇ İSİMLERİ: Koç, Boğa, İkizler, Yengeç, Aslan, Başak, Terazi, Akrep, Yay, Oğlak, Kova, Balık.
@@ -548,23 +548,47 @@ EV SİSTEMİ: Gezegen hangi evdeyse, o evin temasını yoruma yansıt:
 5. ev: Yaratıcılık/aşk | 6. ev: Sağlık/rutin | 7. ev: İlişkiler | 8. ev: Dönüşüm
 9. ev: Felsefe/yolculuk | 10. ev: Kariyer | 11. ev: Topluluk | 12. ev: Bilinçaltı
 
-ÇIKTI FORMATI — Yalnızca geçerli JSON döndür:
+`;
+
+// Gezegen başlıkları tek kaynaktan üretiliyor; parça prompt'ları bundan kuruluyor.
+const PLANET_TITLES = {
+  Sun: 'Güneş Burcun: [Burç Adı]',
+  Moon: 'Ay Burcun: [Burç Adı]',
+  Mercury: 'Merkür: [Burç Adı]',
+  Venus: 'Venüs: [Burç Adı]',
+  Mars: 'Mars: [Burç Adı]',
+  Jupiter: 'Jüpiter: [Burç Adı]',
+  Saturn: 'Satürn: [Burç Adı]',
+  Uranus: 'Uranüs: [Burç Adı]',
+  Neptune: 'Neptün: [Burç Adı]',
+  Pluto: 'Plüton: [Burç Adı]',
+  TrueNode: 'Kuzey Düğüm: [Burç Adı]',
+  Chiron: 'Chiron: [Burç Adı]',
+};
+
+// 12 gezegen × en az 10 cümle tek istekte 3 dakikayı aşıyordu. Gruplar paralel
+// üretilip birleştiriliyor → duvar saati en yavaş gruba iniyor.
+const PLANET_GROUPS = [
+  ['Sun', 'Moon', 'Mercury', 'Venus'],
+  ['Mars', 'Jupiter', 'Saturn', 'Uranus'],
+  ['Neptune', 'Pluto', 'TrueNode', 'Chiron'],
+];
+
+function planetChunkFormat(keys) {
+  const rows = keys.map((k) =>
+    `    "${k}": { "title": "${PLANET_TITLES[k]}", "sign": "[Burç]", "house": [ev numarası], "interpretation": "En az 10 cümle detaylı yorum..." }`
+  ).join(',\n');
+  return `ÇIKTI FORMATI — Yalnızca geçerli JSON döndür. SADECE aşağıdaki gezegenleri yaz, başka anahtar ekleme:
+{
+  "planets": {
+${rows}
+  }
+}`;
+}
+
+const PROFILE_CHUNK_FORMAT = `ÇIKTI FORMATI — Yalnızca geçerli JSON döndür. Gezegen yorumu YAZMA:
 {
   "summary": "4-5 cümle genel kişilik profili. Kim olduğunu, nasıl hissettirdiğini, hayata nasıl yaklaştığını özetle.",
-  "planets": {
-    "Sun": { "title": "Güneş Burcun: [Burç Adı]", "sign": "[Burç]", "house": [ev numarası], "interpretation": "En az 10 cümle detaylı yorum..." },
-    "Moon": { "title": "Ay Burcun: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Mercury": { "title": "Merkür: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Venus": { "title": "Venüs: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Mars": { "title": "Mars: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Jupiter": { "title": "Jüpiter: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Saturn": { "title": "Satürn: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Uranus": { "title": "Uranüs: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Neptune": { "title": "Neptün: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Pluto": { "title": "Plüton: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "TrueNode": { "title": "Kuzey Düğüm: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Chiron": { "title": "Chiron: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." }
-  },
   "strengths": ["somut güçlü yön 1 (1-2 cümle açıklama)", "...", "...en az 5 madde"],
   "hiddenTraits": ["gizli özellik 1 (1-2 cümle açıklama)", "...", "...en az 5 madde"]
 }`;
@@ -592,21 +616,56 @@ KİŞİ:
 NATAL HARİTA (tüm gezegen konumları, evler, açılar):
 ${natalSummary}
 
-Bu kişinin haritasındaki HER gezegen için en az 10 cümlelik derin, kişiye özel yorum yaz. Genel burç yorumu değil — bu kişinin spesifik gezegen-burç-ev kombinasyonuna dayalı benzersiz bir analiz olsun.`;
+Yorumların derin ve kişiye özel olsun. Genel burç yorumu değil — bu kişinin spesifik gezegen-burç-ev kombinasyonuna dayalı benzersiz bir analiz olsun.`;
 
-  const PERSONALITY_TIMEOUT_MS = 300000; // 5 minutes — personality is a large one-time generation
-  return withRetry(async () => {
-    const text = await withTimeout(
-      createGeminiMessage({
-        system: PERSONALITY_SYSTEM_PROMPT,
-        userPrompt,
-        maxTokens: 16000, // headroom — 12-planet analysis is large; avoid truncation on Gemini tokenizer
-        temperature: 0.7,
-      }),
-      PERSONALITY_TIMEOUT_MS
-    );
-    return parseJSONResponse(text);
-  }, 1); // Only 1 retry for personality (it's expensive)
+  // Parça başına timeout. Eskiden tek istek 5 dakikaya kadar bekleyebiliyordu;
+  // artık parçalar paralel ve her biri çok daha küçük.
+  const CHUNK_TIMEOUT_MS = 90000;
+
+  async function chunk(system, extraInstruction, maxTokens) {
+    return withRetry(async () => {
+      const text = await withTimeout(
+        createGeminiMessage({
+          system,
+          userPrompt: extraInstruction ? `${userPrompt}\n\n${extraInstruction}` : userPrompt,
+          maxTokens,
+          temperature: 0.7,
+        }),
+        CHUNK_TIMEOUT_MS
+      );
+      return parseJSONResponse(text);
+    }, 1); // Kişilik analizi pahalı — tek deneme hakkı.
+  }
+
+  // Dört istek paralel: üç gezegen grubu + özet/güçlü yönler/gizli özellikler.
+  // Duvar saati toplam değil, en yavaş parçanın süresi kadar.
+  const [profile, ...planetChunks] = await Promise.all([
+    chunk(`${PERSONALITY_RULES}\n\n${PROFILE_CHUNK_FORMAT}`, null, 3000),
+    ...PLANET_GROUPS.map((keys) =>
+      chunk(
+        `${PERSONALITY_RULES}\n\n${planetChunkFormat(keys)}`,
+        `Yalnızca şu gezegenleri yorumla: ${keys.join(', ')}. Her biri için en az 10 cümle yaz.`,
+        6000
+      )
+    ),
+  ]);
+
+  const planets = {};
+  for (const part of planetChunks) {
+    Object.assign(planets, part?.planets || {});
+  }
+
+  const missing = PLANET_GROUPS.flat().filter((k) => !planets[k]);
+  if (missing.length > 0) {
+    console.warn(`[Gemini] Kişilik analizinde eksik gezegen: ${missing.join(', ')}`);
+  }
+
+  return {
+    summary: profile?.summary || '',
+    planets,
+    strengths: profile?.strengths || [],
+    hiddenTraits: profile?.hiddenTraits || [],
+  };
 }
 
 module.exports = {
