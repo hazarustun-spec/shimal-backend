@@ -1,6 +1,30 @@
 const { toTR } = require('../utils/zodiac-tr');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// gemini-2.5-flash ve -flash-lite yeni API key'lerine kapatıldı ("no longer
+// available to new users" → 404).
+//
+// Model seçimi ölçümle yapıldı (aynı günlük içgörü prompt'u, 3291 token girdi):
+//
+//   model                  düşünme  cevap  süre    maliyet/içgörü
+//   gemini-3.6-flash          2737   1693  23.0s   $0.0382
+//   gemini-3-flash-preview    1531   1812  20.5s   $0.0071
+//   gemini-3.1-flash-lite        0   1901  10.0s   $0.0037  ← seçilen
+//   gemini-3.5-flash-lite        0   1948   9.1s   $0.0059
+//
+// "flash" modelleri düşünmeyi KAPATMAYA İZİN VERMİYOR (aşağıdaki nota bak) ve
+// düşünme token'ları çıktı olarak faturalanıyor → 10 kat maliyet. Lite modeller
+// zaten düşünmüyor. Kalite karşılaştırmasında lite, transit/natal verisini daha
+// somut kullandığı için ayrıca geri adım değil.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+
+// Lite modellerde düşünme sıfır, ama GEMINI_MODEL bir "flash" modeline
+// çevrilirse düşünme token'ları maxOutputTokens bütçesinden yenir ve cevap
+// yarıda kesilir. Bu katsayı o durumda emniyet payı bırakır; faturalama gerçek
+// token'lar üzerinden olduğu için lite kullanırken maliyeti etkilemez.
+const THINKING_HEADROOM = Number(process.env.GEMINI_THINKING_HEADROOM) || 3;
+
+// Gemini 3.x outputTokenLimit. Headroom çarpımı bunu aşarsa API 400 döner.
+const GEMINI_OUTPUT_LIMIT = 65536;
 const { sanitizeForAI } = require('../utils/validate');
 
 const SYSTEM_PROMPT = `Sen Shimal'ın astroloji yorum motorusun. Kişiye özel, samimi ve merak uyandıran günlük burç yorumları üretiyorsun.
@@ -212,17 +236,22 @@ async function createGeminiMessage({ system, userPrompt, maxTokens, temperature 
       'x-goog-api-key': GEMINI_API_KEY,
     },
     body: JSON.stringify({
-      // System prompt is identical on every call → auto implicit-cached on Gemini 2.5 (input savings).
+      // System prompt is identical on every call → auto implicit-cached (input savings).
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
       generationConfig: {
         temperature,
-        maxOutputTokens: maxTokens,
+        // maxOutputTokens düşünme token'larını DA kapsıyor. Gemini 3.x'te
+        // düşünme kapatılamadığı için çağıranların verdiği bütçe burada
+        // THINKING_HEADROOM ile çarpılıyor — aksi halde model bütçeyi
+        // düşünmeye harcayıp finishReason: MAX_TOKENS ile JSON'u yarıda kesiyor.
+        maxOutputTokens: Math.min(Math.ceil(maxTokens * THINKING_HEADROOM), GEMINI_OUTPUT_LIMIT),
         // Guarantees syntactically valid JSON output.
         responseMimeType: 'application/json',
-        // Flash reasons by default and bills those tokens as output. This is
-        // structured JSON generation, not a reasoning task → disable to cut cost + latency.
-        thinkingConfig: { thinkingBudget: 0 },
+        // thinkingConfig GÖNDERİLMİYOR. Gemini 3.x `thinkingBudget: 0` için
+        // 400 INVALID_ARGUMENT döndürüyor; `thinkingLevel` / `thinking_level`
+        // ise v1beta'da da v1alpha'da da tanınmıyor ("Cannot find field").
+        // Yani düşünmeyi kapatmanın bir yolu yok — bütçeyi büyütüp yaşıyoruz.
       },
       // Emotional / relationship astrology text is benign; prevent false-positive safety blocks.
       safetySettings: [
@@ -242,6 +271,18 @@ async function createGeminiMessage({ system, userPrompt, maxTokens, temperature 
 
   const candidate = payload?.candidates?.[0];
   const text = candidate?.content?.parts?.map((p) => p.text).filter(Boolean).join('');
+
+  // safeJsonParse kırpılmış JSON'u sessizce onarıyor, yani MAX_TOKENS tek başına
+  // hataya dönüşmüyor — yarım cümlelik bir içgörü üretiliyor. Loglanmazsa fark
+  // edilmez; görülürse THINKING_HEADROOM artırılmalı.
+  if (candidate?.finishReason === 'MAX_TOKENS') {
+    const u = payload?.usageMetadata || {};
+    console.warn(
+      `[Gemini] Çıktı kırpıldı (MAX_TOKENS). model=${GEMINI_MODEL} ` +
+      `düşünme=${u.thoughtsTokenCount ?? '?'} cevap=${u.candidatesTokenCount ?? '?'} ` +
+      `bütçe=${Math.min(Math.ceil(maxTokens * THINKING_HEADROOM), GEMINI_OUTPUT_LIMIT)}`
+    );
+  }
 
   if (!text) {
     const blockReason = payload?.promptFeedback?.blockReason;
@@ -470,7 +511,7 @@ Yalnızca yukarıdaki gerçek astronomik verileri kullanarak JSON içgörüsün�
 
 // ─── Personality Analysis ────────────────────────────────────────────────────
 
-const PERSONALITY_SYSTEM_PROMPT = `Sen Shimal'ın kişilik analizi motorusun. Kişinin doğum haritasına dayalı derin, detaylı ve kişiye özel bir kişilik profili oluşturuyorsun.
+const PERSONALITY_RULES = `Sen Shimal'ın kişilik analizi motorusun. Kişinin doğum haritasına dayalı derin, detaylı ve kişiye özel bir kişilik profili oluşturuyorsun.
 
 DİL: Yanıtındaki HER kelime Türkçe olmalı. İngilizce kelime KULLANMA. Kesinlikle Korece, Japonca, Çince veya başka alfabe karakterleri kullanma — yalnızca Türk alfabesi (A-Z + Ğ Ü Ş İ Ö Ç). "때로" yerine "bazen", "zaman zaman" kullan.
 BURÇ İSİMLERİ: Koç, Boğa, İkizler, Yengeç, Aslan, Başak, Terazi, Akrep, Yay, Oğlak, Kova, Balık.
@@ -483,6 +524,28 @@ YAZIM TARZI:
 - Her gezegen yorumu en az 10 cümle olmalı. Derinlemesine ve detaylı yaz.
 - Gezegen burç ve ev kombinasyonunu birlikte yorumla.
 - Retrograd gezegenler varsa etkisini özellikle belirt.
+
+ASLA DERS KİTABI GİBİ YAZMA — EN ÖNEMLİ KURAL:
+Yerleşimi tarif ederek başlama. Doğrudan kişiyi anlat. Okuyan kişi astroloji
+dersi değil, kendi hayatını okuduğunu hissetmeli.
+
+- YASAK AÇILIŞ KALIPLARI: "X'in Y evde yer alması ... gösterir", "Bu yerleşim
+  ... anlamına gelir", "... olduğunu işaret eder", "temel kimliğini oluşturur".
+- Burcun sembolünü imgeye çevir: Yay okçudur, Akrep derinlere dalar, Boğa
+  kök salar. Bu imgeyi cümlenin içine doğal olarak ör.
+- Somut hayat alanı adlandır: kardeşler, komşular, iş arkadaşları, yazmak,
+  yolculuk, para, uyku. Soyut "enerji"/"potansiyel" dili yerine bunları kullan.
+- En az bir cümlede kişinin gerçek hayatta yapabileceği somut bir şey söyle
+  ("Yazma yeteneğin güçlü olabilir, özellikle felsefi konularda" gibi).
+
+İYİ: "Sen kelimelerin gücüne inanan, düşüncelerini ok gibi hedefine fırlatan bir
+hikâye anlatıcısısın. Kardeşlerinle veya yakın çevrenle ilişkilerin sıra dışı —
+belki de onlara rehberlik eden konumdasın. Kısa yolculuklar seni heyecanlandırıyor,
+çünkü her yeni yer yeni bir perspektif demek."
+
+KÖTÜ: "Güneşinin üçüncü evde yer alması, iletişim kurma biçiminin temel kimliğini
+oluşturduğunu gösterir. Sen, bilgiyi yaymayı bir yaşam amacı haline getirmiş
+birisin. Zihninin hızı, çevrendeki olayları kavrama biçimini doğrudan etkiler."
 
 HER GEZEGEN İÇİN YORUM KURALLARI:
 
@@ -499,33 +562,57 @@ HER GEZEGEN İÇİN YORUM KURALLARI:
 ☊ KUZEY DÜĞÜM: Ruhsal büyüme yönü, karmik amaç, bu hayatta öğrenmesi gereken ders.
 ⚷ CHIRON: En derin yara, iyileştirme potansiyeli, başkalarına yardım gücü.
 
-GÜÇLÜ YÖNLER: Natal açılardan ve gezegen yerleşimlerinden 5-7 somut güçlü yön çıkar. Soyut değil, pratik ve gerçek hayata dokunan.
-GİZLİ ÖZELLİKLER: Kişinin farkında olmadığı ama haritasında açıkça görünen 5-7 özellik. Sürpriz etkisi yaratsın.
+GÜÇLÜ YÖNLER: Natal açılardan ve gezegen yerleşimlerinden TAM 7 somut güçlü yön çıkar. Soyut değil, pratik ve gerçek hayata dokunan.
+GİZLİ ÖZELLİKLER: Kişinin farkında olmadığı ama haritasında açıkça görünen TAM 7 özellik. Sürpriz etkisi yaratsın.
 
 EV SİSTEMİ: Gezegen hangi evdeyse, o evin temasını yoruma yansıt:
 1. ev: Kimlik | 2. ev: Değerler/para | 3. ev: İletişim | 4. ev: Ev/aile
 5. ev: Yaratıcılık/aşk | 6. ev: Sağlık/rutin | 7. ev: İlişkiler | 8. ev: Dönüşüm
 9. ev: Felsefe/yolculuk | 10. ev: Kariyer | 11. ev: Topluluk | 12. ev: Bilinçaltı
 
-ÇIKTI FORMATI — Yalnızca geçerli JSON döndür:
+`;
+
+// Gezegen başlıkları tek kaynaktan üretiliyor; parça prompt'ları bundan kuruluyor.
+const PLANET_TITLES = {
+  Sun: 'Güneş Burcun: [Burç Adı]',
+  Moon: 'Ay Burcun: [Burç Adı]',
+  Mercury: 'Merkür: [Burç Adı]',
+  Venus: 'Venüs: [Burç Adı]',
+  Mars: 'Mars: [Burç Adı]',
+  Jupiter: 'Jüpiter: [Burç Adı]',
+  Saturn: 'Satürn: [Burç Adı]',
+  Uranus: 'Uranüs: [Burç Adı]',
+  Neptune: 'Neptün: [Burç Adı]',
+  Pluto: 'Plüton: [Burç Adı]',
+  TrueNode: 'Kuzey Düğüm: [Burç Adı]',
+  Chiron: 'Chiron: [Burç Adı]',
+};
+
+// 12 gezegen × en az 10 cümle tek istekte 3 dakikayı aşıyordu. Gruplar paralel
+// üretilip birleştiriliyor → duvar saati en yavaş gruba iniyor.
+const PLANET_GROUPS = [
+  ['Sun', 'Moon', 'Mercury', 'Venus'],
+  ['Mars', 'Jupiter', 'Saturn', 'Uranus'],
+  ['Neptune', 'Pluto', 'TrueNode', 'Chiron'],
+];
+
+function planetChunkFormat(keys) {
+  const rows = keys.map((k) =>
+    `    "${k}": { "title": "${PLANET_TITLES[k]}", "sign": "[Burç]", "house": [ev numarası], "interpretation": "En az 10 cümle detaylı yorum..." }`
+  ).join(',\n');
+  return `ÇIKTI FORMATI — Yalnızca geçerli JSON döndür. SADECE aşağıdaki gezegenleri yaz, başka anahtar ekleme:
+{
+  "planets": {
+${rows}
+  }
+}`;
+}
+
+const PROFILE_CHUNK_FORMAT = `ÇIKTI FORMATI — Yalnızca geçerli JSON döndür. Gezegen yorumu YAZMA:
 {
   "summary": "4-5 cümle genel kişilik profili. Kim olduğunu, nasıl hissettirdiğini, hayata nasıl yaklaştığını özetle.",
-  "planets": {
-    "Sun": { "title": "Güneş Burcun: [Burç Adı]", "sign": "[Burç]", "house": [ev numarası], "interpretation": "En az 10 cümle detaylı yorum..." },
-    "Moon": { "title": "Ay Burcun: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Mercury": { "title": "Merkür: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Venus": { "title": "Venüs: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Mars": { "title": "Mars: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Jupiter": { "title": "Jüpiter: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Saturn": { "title": "Satürn: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Uranus": { "title": "Uranüs: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Neptune": { "title": "Neptün: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Pluto": { "title": "Plüton: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "TrueNode": { "title": "Kuzey Düğüm: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." },
-    "Chiron": { "title": "Chiron: [Burç Adı]", "sign": "[Burç]", "house": [ev], "interpretation": "..." }
-  },
-  "strengths": ["somut güçlü yön 1 (1-2 cümle açıklama)", "...", "...en az 5 madde"],
-  "hiddenTraits": ["gizli özellik 1 (1-2 cümle açıklama)", "...", "...en az 5 madde"]
+  "strengths": ["somut güçlü yön 1 (1-2 cümle açıklama)", "...", "...TAM 7 madde"],
+  "hiddenTraits": ["gizli özellik 1 (1-2 cümle açıklama)", "...", "...TAM 7 madde"]
 }`;
 
 /**
@@ -551,21 +638,56 @@ KİŞİ:
 NATAL HARİTA (tüm gezegen konumları, evler, açılar):
 ${natalSummary}
 
-Bu kişinin haritasındaki HER gezegen için en az 10 cümlelik derin, kişiye özel yorum yaz. Genel burç yorumu değil — bu kişinin spesifik gezegen-burç-ev kombinasyonuna dayalı benzersiz bir analiz olsun.`;
+Yorumların derin ve kişiye özel olsun. Genel burç yorumu değil — bu kişinin spesifik gezegen-burç-ev kombinasyonuna dayalı benzersiz bir analiz olsun.`;
 
-  const PERSONALITY_TIMEOUT_MS = 300000; // 5 minutes — personality is a large one-time generation
-  return withRetry(async () => {
-    const text = await withTimeout(
-      createGeminiMessage({
-        system: PERSONALITY_SYSTEM_PROMPT,
-        userPrompt,
-        maxTokens: 16000, // headroom — 12-planet analysis is large; avoid truncation on Gemini tokenizer
-        temperature: 0.7,
-      }),
-      PERSONALITY_TIMEOUT_MS
-    );
-    return parseJSONResponse(text);
-  }, 1); // Only 1 retry for personality (it's expensive)
+  // Parça başına timeout. Eskiden tek istek 5 dakikaya kadar bekleyebiliyordu;
+  // artık parçalar paralel ve her biri çok daha küçük.
+  const CHUNK_TIMEOUT_MS = 90000;
+
+  async function chunk(system, extraInstruction, maxTokens) {
+    return withRetry(async () => {
+      const text = await withTimeout(
+        createGeminiMessage({
+          system,
+          userPrompt: extraInstruction ? `${userPrompt}\n\n${extraInstruction}` : userPrompt,
+          maxTokens,
+          temperature: 0.7,
+        }),
+        CHUNK_TIMEOUT_MS
+      );
+      return parseJSONResponse(text);
+    }, 1); // Kişilik analizi pahalı — tek deneme hakkı.
+  }
+
+  // Dört istek paralel: üç gezegen grubu + özet/güçlü yönler/gizli özellikler.
+  // Duvar saati toplam değil, en yavaş parçanın süresi kadar.
+  const [profile, ...planetChunks] = await Promise.all([
+    chunk(`${PERSONALITY_RULES}\n\n${PROFILE_CHUNK_FORMAT}`, null, 3000),
+    ...PLANET_GROUPS.map((keys) =>
+      chunk(
+        `${PERSONALITY_RULES}\n\n${planetChunkFormat(keys)}`,
+        `Yalnızca şu gezegenleri yorumla: ${keys.join(', ')}. Her biri için en az 10 cümle yaz.`,
+        6000
+      )
+    ),
+  ]);
+
+  const planets = {};
+  for (const part of planetChunks) {
+    Object.assign(planets, part?.planets || {});
+  }
+
+  const missing = PLANET_GROUPS.flat().filter((k) => !planets[k]);
+  if (missing.length > 0) {
+    console.warn(`[Gemini] Kişilik analizinde eksik gezegen: ${missing.join(', ')}`);
+  }
+
+  return {
+    summary: profile?.summary || '',
+    planets,
+    strengths: profile?.strengths || [],
+    hiddenTraits: profile?.hiddenTraits || [],
+  };
 }
 
 module.exports = {
