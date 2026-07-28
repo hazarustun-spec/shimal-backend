@@ -26,9 +26,11 @@ const PREMIUM_ON_EVENTS = new Set([
   'UNCANCELLATION',
 ]);
 
-/** Events that revoke premium */
+/** Events that revoke premium.
+ * CANCELLATION is deliberately NOT here: it only means auto-renew was turned
+ * off — the user keeps access until the paid period ends, at which point
+ * RevenueCat sends EXPIRATION. */
 const PREMIUM_OFF_EVENTS = new Set([
-  'CANCELLATION',
   'EXPIRATION',
 ]);
 
