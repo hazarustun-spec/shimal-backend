@@ -23,3 +23,6 @@ pids/
 # Build output (if added later)
 dist/
 build/
+
+# Claude Code oturum dosyaları
+.claude/

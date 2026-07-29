@@ -36,12 +36,41 @@ function setSecurityHeaders(res) {
 //   • Development + key tanımlı değil                     → uyarı logla, geç (yerel kolaylık)
 //   • Development + key tanımlı                           → production ile aynı katı kural
 //
+// SHIMAL_API_KEY_PREVIOUS tanımlıysa o da kabul edilir — yalnızca rotasyon
+// geçiş dönemi için. Ayrıntı: aşağıdaki previousKey yorumu.
+//
 // Returns: true (geçti) / false (response yazıldı)
 
 let _devKeyWarningLogged = false;
+let _previousKeyHits = 0;
+let _previousKeyLastLog = 0;
+
+// Sabit maliyetli karşılaştırma. Uzunluk farklıysa bile bir timingSafeEqual
+// çalıştırıyoruz ki cevap süresi anahtar uzunluğunu sızdırmasın.
+function keyMatches(serverKey, clientKey) {
+  try {
+    if (serverKey.length !== clientKey.length) {
+      const dummy = Buffer.alloc(serverKey.length, 0);
+      crypto.timingSafeEqual(dummy, Buffer.from(serverKey, 'utf8'));
+      return false;
+    }
+    return crypto.timingSafeEqual(
+      Buffer.from(serverKey, 'utf8'),
+      Buffer.from(clientKey, 'utf8')
+    );
+  } catch {
+    return false;
+  }
+}
 
 function checkApiKey(req, res) {
   const serverKey = process.env.SHIMAL_API_KEY;
+  // Anahtar rotasyonu için geçiş dönemi anahtarı. Yayınlanmış istemciler eski
+  // anahtarı gömülü taşıdığı için yeni anahtara geçerken eskisi bir süre daha
+  // kabul edilmeli, yoksa güncellemeyen herkes 401 alır. Yeni sürüm yaygınlaşınca
+  // bu değişken silinir — kullanım sayısı loglanıyor ki ne zaman güvenli olduğu
+  // görülebilsin.
+  const previousKey = process.env.SHIMAL_API_KEY_PREVIOUS;
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (!serverKey) {
@@ -65,25 +94,25 @@ function checkApiKey(req, res) {
     return false;
   }
 
-  // Timing-safe karşılaştırma (uzunluk sızıntısını önlemek için pad + equal-length kontrol)
-  try {
-    if (serverKey.length !== clientKey.length) {
-      // Timing'ı sabit tutmak için yine de bir karşılaştırma yap
-      const dummy = Buffer.alloc(serverKey.length, 0);
-      crypto.timingSafeEqual(dummy, Buffer.from(serverKey, 'utf8'));
-      writeJson(res, 401, { error: 'Geçersiz API anahtarı' });
-      return false;
+  if (keyMatches(serverKey, clientKey)) return true;
+
+  if (previousKey && keyMatches(previousKey, clientKey)) {
+    _previousKeyHits += 1;
+    // Saatte bir özet: sıfıra indiğinde SHIMAL_API_KEY_PREVIOUS kaldırılabilir.
+    const now = Date.now();
+    if (now - _previousKeyLastLog > 3600_000) {
+      console.warn(
+        `[Security] Eski API anahtarı hâlâ kullanılıyor (son özetten beri ${_previousKeyHits} istek). ` +
+        'Sıfırlanınca SHIMAL_API_KEY_PREVIOUS silinebilir.'
+      );
+      _previousKeyLastLog = now;
+      _previousKeyHits = 0;
     }
-    if (!crypto.timingSafeEqual(Buffer.from(serverKey, 'utf8'), Buffer.from(clientKey, 'utf8'))) {
-      writeJson(res, 401, { error: 'Geçersiz API anahtarı' });
-      return false;
-    }
-  } catch {
-    writeJson(res, 401, { error: 'Geçersiz API anahtarı' });
-    return false;
+    return true;
   }
 
-  return true;
+  writeJson(res, 401, { error: 'Geçersiz API anahtarı' });
+  return false;
 }
 
 // ─── User-Agent bot koruması ──────────────────────────────────────────────────
@@ -372,6 +401,7 @@ function getRequestUrl(req) {
 module.exports = {
   setSecurityHeaders,
   checkApiKey,
+  keyMatches,
   checkUserAgent,
   checkOwnership,
   checkCronKey,
