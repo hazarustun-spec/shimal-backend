@@ -300,15 +300,21 @@ function generateSessionToken(deviceId) {
 // Ensures the requesting device can only access its own data.
 // The mobile app sends x-device-id + x-session-token headers on every request.
 //
-// `strict=true` (opt-in): session token EKSIK olması da 401 üretir.
-// Write / mutation endpoint'leri (feedback, profile update, vs.) strict kullanmalı.
-// Read endpoint'leri graceful degradation modunda kalabilir (eski istemci uyumu).
+// Fail-closed: BOTH headers are mandatory on every ownership-checked endpoint,
+// reads included. There used to be a "graceful degradation" mode where a
+// missing session token was merely logged and let through, so x-api-key plus a
+// known device UUID was enough to read another user's row. The API key ships
+// inside every IPA and is therefore not a secret, which left those reads
+// effectively unauthenticated. There is no client-compat reason to keep the
+// escape hatch: the app registers on every cold launch (ContentView.swift:105
+// → UserProfileManager.ensureRegistered, gated because hasVerifiedRegistration
+// is not persisted) and blocks its UI until the resulting token is stored, so a
+// live client always holds one by the time it issues a read.
 //
-// NOT: Bu fonksiyon artık ASYNC — DB'den token hash'ini okuyor olabilir.
+// NOT: Bu fonksiyon ASYNC — DB'den token hash'ini okuyor olabilir.
 // Tüm caller'lar `await` etmeli.
 
-async function checkOwnership(req, res, targetDeviceId, options = {}) {
-  const strict = options.strict === true;
+async function checkOwnership(req, res, targetDeviceId) {
   const callerDeviceId = req.headers['x-device-id'] || '';
   if (!callerDeviceId) {
     writeJson(res, 401, { error: 'Cihaz kimliği header\'ı eksik' });
@@ -322,13 +328,9 @@ async function checkOwnership(req, res, targetDeviceId, options = {}) {
   // ── Session token doğrulama ───────────────────────────────────────────────
   const clientToken = req.headers['x-session-token'] || '';
   if (!clientToken) {
-    if (strict) {
-      writeJson(res, 401, { error: 'Oturum tokenı eksik. Lütfen uygulamayı yeniden başlatın.' });
-      return false;
-    }
-    // Graceful degradation: token yoksa eski istemcileri kırmamak için geçir, logla
     console.warn(`[Security] No session token — device=${targetDeviceId.substring(0, 8)}... path=${req.url}`);
-    return true;
+    writeJson(res, 401, { error: 'Oturum tokenı eksik. Lütfen uygulamayı yeniden başlatın.' });
+    return false;
   }
 
   const result = await sessionTokenModule.verifyToken(targetDeviceId, clientToken);

@@ -130,8 +130,7 @@ async function handleUserPushToken(req, res) {
     if (!isValidDeviceId(deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    // Strict: push token güncellemesi mutation
-    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
+    if (!(await checkOwnership(req, res, deviceId))) return;
     if (!pushToken || typeof pushToken !== 'string' || pushToken.length < 10 || pushToken.length > 200) {
       return badRequest(res, 'Geçersiz bildirim token formatı');
     }
@@ -150,6 +149,12 @@ async function handleUserPushToken(req, res) {
 
 async function handleUserGet(req, res, params) {
   try {
+    // Diğer okuma uçları (daily, personality) bu kontrolü yapıyordu, bu yapmıyordu.
+    // Sahiplik kontrolü yine de tutuyor ama UUID olmayan girdi buraya kadar
+    // gelmemeli — 403 yerine 400 dönmek doğru cevap.
+    if (!isValidDeviceId(params.deviceId)) {
+      return badRequest(res, 'Geçersiz cihaz kimliği');
+    }
     if (!(await checkOwnership(req, res, params.deviceId))) return;
 
     const { data: user, error } = await supabase
@@ -174,8 +179,7 @@ async function handleUserDelete(req, res, params) {
     if (!isValidDeviceId(params.deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    // Strict: hesap silme mutation — session token zorunlu
-    if (!(await checkOwnership(req, res, params.deviceId, { strict: true }))) return;
+    if (!(await checkOwnership(req, res, params.deviceId))) return;
 
     const { data: user, error: findError } = await supabase
       .from('users')
@@ -217,8 +221,7 @@ async function handleUserDeletePost(req, res) {
     if (!deviceId || !isValidDeviceId(deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    // Strict: hesap silme mutation — session token zorunlu
-    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
+    if (!(await checkOwnership(req, res, deviceId))) return;
 
     const { data: user, error: findError } = await supabase
       .from('users')
@@ -326,8 +329,7 @@ async function handleUpdateProfile(req, res) {
     } = body;
 
     if (!deviceId || !isValidDeviceId(deviceId)) return badRequest(res, 'Geçersiz cihaz kimliği');
-    // Strict: profile update mutation
-    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
+    if (!(await checkOwnership(req, res, deviceId))) return;
 
     // Validate optional birth fields if provided
     if (birthDate && !isValidBirthDate(birthDate)) return badRequest(res, 'Geçersiz doğum tarihi');
@@ -420,8 +422,7 @@ async function handleUserRefreshTime(req, res) {
     if (!deviceId || !isValidDeviceId(deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    // Strict: refresh time update mutation
-    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
+    if (!(await checkOwnership(req, res, deviceId))) return;
 
     const hour   = Number(refreshHour);
     const minute = Number(refreshMinute);
@@ -457,8 +458,7 @@ async function handleUpdatePremium(req, res) {
     if (typeof isPremium !== 'boolean') {
       return badRequest(res, 'isPremium boolean olmalı');
     }
-    // Strict: premium status update mutation
-    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
+    if (!(await checkOwnership(req, res, deviceId))) return;
 
     const { error } = await supabase
       .from('users')

@@ -455,8 +455,7 @@ async function handleLogout(req, res) {
     if (!deviceId || !isValidDeviceId(deviceId)) {
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    // Strict: session token zorunlu — saldırgan başka cihazın session'ını revoke edemesin
-    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) return;
+    if (!(await checkOwnership(req, res, deviceId))) return;
 
     await revokeToken(deviceId);
     console.log(`[Auth] Logout — session token revoked for device ${deviceId.substring(0, 8)}...`);

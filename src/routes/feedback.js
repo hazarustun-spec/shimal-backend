@@ -19,8 +19,7 @@ async function handlePostFeedback(req, res, params) {
       console.warn(`[Feedback] ✗ Invalid deviceId: ${deviceId}`);
       return badRequest(res, 'Geçersiz cihaz kimliği');
     }
-    // Strict mode: feedback bir mutation, session token zorunlu
-    if (!(await checkOwnership(req, res, deviceId, { strict: true }))) {
+    if (!(await checkOwnership(req, res, deviceId))) {
       console.warn(`[Feedback] ✗ Ownership check failed for device=${deviceId.substring(0, 8)}...`);
       return;
     }

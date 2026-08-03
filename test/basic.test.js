@@ -3,7 +3,7 @@
 const { toTR, ZODIAC_TR } = require('../src/utils/zodiac-tr');
 const { isValidDeviceId, isValidBirthDate, isValidBirthTime, isValidPhone, isValidOtp, isValidText } = require('../src/utils/validate');
 const { checkContent } = require('../src/utils/content-guard');
-const { keyMatches } = require('../src/utils/http');
+const { keyMatches, checkOwnership } = require('../src/utils/http');
 
 let passed = 0;
 let failed = 0;
@@ -89,11 +89,65 @@ assert(keyMatches(KEY_A, '') === false, 'empty client key rejected');
 assert(keyMatches(KEY_A, 'a'.repeat(63) + 'b') === false, 'single trailing char difference rejected');
 assert(keyMatches(KEY_A, 'b' + 'a'.repeat(63)) === false, 'single leading char difference rejected');
 
-// ─── Summary ─────────────────────────────────────────────────────────────────
-console.log(`\n═══════════════════════════`);
-console.log(`  ✓ Passed: ${passed}`);
-console.log(`  ✗ Failed: ${failed}`);
-console.log(`  Total:    ${passed + failed}`);
-console.log(`═══════════════════════════\n`);
+// ─── Ownership check (fail-closed) ───────────────────────────────────────────
+// Bu uç noktalar eskiden session token'ı opsiyonel sayıyordu: token yoksa
+// uyarı basılıp istek GEÇİRİLİYORDU. API anahtarı her IPA'nın içinde gittiği
+// için gizli değil, dolayısıyla anahtar + bilinen bir device UUID başkasının
+// satırını okumaya yetiyordu. Aşağıdaki üç durum da 2xx dönmemeli.
 
-process.exit(failed > 0 ? 1 : 0);
+const DEV_A = 'AAAABBBB-1111-2222-3333-444455556666';
+const DEV_B = 'CCCCDDDD-9999-8888-7777-666655554444';
+
+/** node:http ServerResponse'un checkOwnership'in dokunduğu kadarını taklit eder */
+function mockRes() {
+  return {
+    statusCode: null,
+    payload: null,
+    setHeader() {},
+    writeHead(code) { this.statusCode = code; },
+    end(body) { this.payload = JSON.parse(body); },
+  };
+}
+
+const mockReq = (headers) => ({ headers, url: '/api/user/' + DEV_A });
+
+async function ownershipTests() {
+  console.log('--- http.checkOwnership ---');
+
+  // x-device-id hiç yok
+  let res = mockRes();
+  let ok = await checkOwnership(mockReq({}), res, DEV_A);
+  assert(ok === false, 'missing x-device-id rejected');
+  assert(res.statusCode === 401, 'missing x-device-id → 401');
+
+  // Başka birinin cihazını istemek
+  res = mockRes();
+  ok = await checkOwnership(mockReq({ 'x-device-id': DEV_B }), res, DEV_A);
+  assert(ok === false, 'device id mismatch rejected');
+  assert(res.statusCode === 403, 'device id mismatch → 403');
+
+  // Regresyon koruması: doğru cihaz ama session token yok.
+  // Eskiden burası `true` dönüyordu — açığın ta kendisi.
+  res = mockRes();
+  ok = await checkOwnership(mockReq({ 'x-device-id': DEV_A }), res, DEV_A);
+  assert(ok === false, 'missing session token rejected (read endpoints too)');
+  assert(res.statusCode === 401, 'missing session token → 401');
+
+  // Boş string token da eksik sayılmalı
+  res = mockRes();
+  ok = await checkOwnership(
+    mockReq({ 'x-device-id': DEV_A, 'x-session-token': '' }), res, DEV_A);
+  assert(ok === false, 'empty session token rejected');
+  assert(res.statusCode === 401, 'empty session token → 401');
+}
+
+// ─── Summary ─────────────────────────────────────────────────────────────────
+ownershipTests().then(() => {
+  console.log(`\n═══════════════════════════`);
+  console.log(`  ✓ Passed: ${passed}`);
+  console.log(`  ✗ Failed: ${failed}`);
+  console.log(`  Total:    ${passed + failed}`);
+  console.log(`═══════════════════════════\n`);
+
+  process.exit(failed > 0 ? 1 : 0);
+});
