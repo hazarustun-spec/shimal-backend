@@ -1,6 +1,8 @@
 # Shimal Backend
 
-Express.js backend that calculates real astrological data using Swiss Ephemeris and generates personalized daily insights using Claude AI.
+Backend that calculates real astrological data using Swiss Ephemeris and generates personalized daily insights using Google Gemini.
+
+Built on Node's built-in `node:http` module — there is no Express dependency, so routes are plain `[method, pathRegex, handler]` tuples registered in `src/index.js`.
 
 ## Quick Start
 
@@ -16,7 +18,8 @@ cp .env.example .env
 ```
 Then open `.env` and fill in your API keys:
 - **SUPABASE_URL** + **SUPABASE_SERVICE_KEY**: From Supabase dashboard → Settings → API
-- **ANTHROPIC_API_KEY**: From console.anthropic.com → API Keys
+- **GEMINI_API_KEY**: From aistudio.google.com → API Keys. Required — the
+  server refuses to boot without it (`src/index.js:26`).
 - **ONESIGNAL_APP_ID** + **ONESIGNAL_API_KEY**: From OneSignal dashboard (optional for dev)
 
 ### 3. Set up the database
