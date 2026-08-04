@@ -5,6 +5,19 @@
 
 const ONESIGNAL_API_URL = 'https://onesignal.com/api/v1';
 
+// .env.example'dan kopyalanıp doldurulmadan bırakılan değerler. Bunlar
+// "tanımlı" olduğu için varlık kontrolünden geçip OneSignal'de 401 alıyor.
+const PLACEHOLDER_VALUES = new Set([
+  'your-onesignal-rest-api-key',
+  'your-onesignal-app-id',
+  'your_onesignal_rest_api_key',
+  'your_onesignal_app_id',
+]);
+
+function isPlaceholder(value) {
+  return !value || PLACEHOLDER_VALUES.has(value.trim().toLowerCase());
+}
+
 /**
  * Send a push notification to a specific device
  *
@@ -14,8 +27,11 @@ const ONESIGNAL_API_URL = 'https://onesignal.com/api/v1';
  * @param {object} data - Additional data payload
  */
 async function sendPushNotification(playerId, message, heading = 'Shimal', data = {}) {
-  if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_API_KEY) {
-    console.log('[Push] OneSignal not configured, skipping notification');
+  if (isPlaceholder(process.env.ONESIGNAL_APP_ID) || isPlaceholder(process.env.ONESIGNAL_API_KEY)) {
+    console.error(
+      '[Push] OneSignal yapılandırılmamış — ONESIGNAL_APP_ID / ONESIGNAL_API_KEY ' +
+      'eksik veya .env.example placeholder değeri olarak bırakılmış. Bildirim gönderilmedi.'
+    );
     return null;
   }
 
@@ -40,6 +56,18 @@ async function sendPushNotification(playerId, message, heading = 'Shimal', data 
     });
 
     const result = await response.json();
+
+    // response.ok kontrol edilmiyordu: OneSignal 401/400 dönse bile aşağıdaki
+    // satır "Sent" yazıyordu. Bildirimlerin uzun süre sessizce ölü kalmasının
+    // sebebi buydu.
+    if (!response.ok) {
+      console.error(
+        `[Push] OneSignal reddetti (HTTP ${response.status}): ` +
+        `${JSON.stringify(result?.errors || result).substring(0, 200)}`
+      );
+      return null;
+    }
+
     console.log(`[Push] Sent to ${playerId}: ${message.substring(0, 50)}...`);
     return result;
   } catch (error) {

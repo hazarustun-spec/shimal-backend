@@ -9,22 +9,25 @@
 //   4. Server token'ı hash'leyip DB'deki hash ile timing-safe karşılaştırır
 //   5. Rotation: yeni random token üret → DB'deki hash'i güncelle → client'a yeni token dön
 //
-// Eski HMAC sistemi ile geriye uyumluluk:
-//   - Eğer DB'deki session_token_hash NULL ise kullanıcı eski HMAC modunda
-//   - Bu durumda legacy HMAC doğrulaması devreye girer
-//   - İlk başarılı authenticated request'te otomatik yeni random token'a geçilir
+// Legacy HMAC modu KALDIRILDI. Eskiden token, HMAC(SHIMAL_SESSION_SECRET,
+// deviceId) olarak da doğrulanabiliyordu. O secret rotasyon sırasında bilerek
+// eski API anahtarının değerine sabitlenmişti ve o anahtar düz metin olarak
+// sızmıştı — yani token türetilebilir bir değerdi ve sahiplik kontrolünü
+// tamamen geçersiz kılıyordu. Türetilebilir bir token, token olmamasıyla
+// aynı şey.
+//
+// Geriye uyumluluk gerekçesi de geçersizdi: istemci her soğuk açılışta
+// yeniden register oluyor (ContentView.swift:105) ve DB destekli taze token
+// alıyor, alana kadar da arayüzü açmıyor. Legacy'ye bağlı hiçbir akış yok.
+//
+// Artık token'ın TEK geçerli formu DB'de hash'i saklanan random token.
+// DB okunamıyorsa doğrulama başarısız olur (fail-closed) — eskiden burada
+// HMAC'e düşülüyordu.
 //
 // Performans: In-memory cache (15dk TTL) → her request için DB lookup yapmaz.
 
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
-
-// ─── Legacy HMAC (backward compat) ───────────────────────────────────────────
-
-function legacyHmacToken(deviceId) {
-  const secret = process.env.SHIMAL_SESSION_SECRET || process.env.SHIMAL_API_KEY || 'shimal-dev-secret';
-  return crypto.createHmac('sha256', secret).update(deviceId).digest('hex');
-}
 
 // ─── Token generation ────────────────────────────────────────────────────────
 
@@ -106,49 +109,25 @@ async function getStoredTokenHash(deviceId) {
 
 /**
  * Client'ın gönderdiği raw token'ı doğrular.
- * Return:
- *   - true  → geçerli
- *   - false → geçersiz (client yanlış token verdi)
- *   - 'legacy' → DB'de hash yok, eski HMAC eşleşti (upgrade yap)
+ * Return: true → geçerli, false → geçersiz.
+ *
+ * DB okunamadığında da false döner. Kullanılabilirlik adına HMAC'e düşmek,
+ * secret'ı bilen herkese geçerli token üretme imkânı verdiği için kaldırıldı;
+ * zaten DB olmadan hiçbir uç anlamlı cevap üretemiyor.
  */
 async function verifyToken(deviceId, clientToken) {
   if (!clientToken || typeof clientToken !== 'string') return false;
 
   const storedHash = await getStoredTokenHash(deviceId);
 
-  // DB erişilemez → legacy HMAC fallback (fail-open for availability)
-  // NOT: Bu, güvenlik seviyesini düşürür — DB düzeldiğinde otomatik olarak
-  //      random token doğrulamaya geri dönülür.
-  if (storedHash === undefined) {
-    const legacyResult = verifyLegacyHmac(deviceId, clientToken);
-    if (legacyResult) {
-      console.warn(`[SessionToken] DB outage — ${deviceId.substring(0, 8)}... legacy HMAC ile doğrulandı`);
-    }
-    return legacyResult ? 'legacy' : false;
-  }
+  // undefined → DB erişilemedi. null → kullanıcının aktif oturumu yok
+  // (hiç register olmamış ya da revokeToken çağrılmış). İkisi de reddedilir.
+  if (!storedHash) return false;
 
-  // DB'de hash var → random token doğrulama
-  if (storedHash) {
-    const clientHash = hashToken(clientToken);
-    try {
-      const a = Buffer.from(clientHash, 'hex');
-      const b = Buffer.from(storedHash, 'hex');
-      if (a.length !== b.length) return false;
-      return crypto.timingSafeEqual(a, b);
-    } catch {
-      return false;
-    }
-  }
-
-  // DB'de hash null → kullanıcı henüz migrate edilmemiş, legacy HMAC dene
-  return verifyLegacyHmac(deviceId, clientToken) ? 'legacy' : false;
-}
-
-function verifyLegacyHmac(deviceId, clientToken) {
-  const expected = legacyHmacToken(deviceId);
+  const clientHash = hashToken(clientToken);
   try {
-    const a = Buffer.from(expected, 'hex');
-    const b = Buffer.from(clientToken, 'hex');
+    const a = Buffer.from(clientHash, 'hex');
+    const b = Buffer.from(storedHash, 'hex');
     if (a.length !== b.length) return false;
     return crypto.timingSafeEqual(a, b);
   } catch {
@@ -176,17 +155,19 @@ async function issueNewToken(deviceId) {
       .eq('device_id', deviceId);
 
     if (error) {
-      // DB'ye yazılamadıysa (örn. kolon yoksa) legacy HMAC'e düş
-      console.warn('[SessionToken] Hash update hatası, legacy HMAC fallback:', error.message || error);
-      return legacyHmacToken(deviceId);
+      // Hash yazılamadıysa doğrulanabilir bir token da veremeyiz. Eskiden
+      // burada legacy HMAC dönülüyordu; o token DB'ye hiç yazılmadığı için
+      // sonsuza dek geçerli ve secret'ı bilen herkesçe üretilebilirdi.
+      console.error('[SessionToken] Hash update hatası, token verilemedi:', error.message || error);
+      return null;
     }
 
     invalidateTokenCache(deviceId);
     tokenCache.set(deviceId, { hash, cachedAt: Date.now() });
     return rawToken;
   } catch (err) {
-    console.warn('[SessionToken] Issue exception, legacy HMAC fallback:', err.message || err);
-    return legacyHmacToken(deviceId);
+    console.error('[SessionToken] Issue exception, token verilemedi:', err.message || err);
+    return null;
   }
 }
 
@@ -213,6 +194,4 @@ module.exports = {
   verifyToken,
   revokeToken,
   invalidateTokenCache,
-  // Legacy export — http.js hâlâ bunu import ediyor olabilir
-  legacyHmacToken,
 };

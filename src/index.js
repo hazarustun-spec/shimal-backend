@@ -31,6 +31,22 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
+// SUPABASE_SERVICE_KEY gerçekten servis anahtarı mı?
+// `sb_publishable_` tarayıcıya konulması tasarlanmış anon anahtar; RLS'e tabidir
+// ve gizli sayılmaz. Servis anahtarı `sb_secret_` (yeni format) ya da JWT
+// (`eyJ...`, legacy service_role) olur. Yanlış anahtar sessizce "çalışıyor"
+// görünebilir — RLS kapalıysa herkese açık bir anahtar tüm tabloya erişir.
+{
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (key.startsWith('sb_publishable_') || key.startsWith('sb_anon_')) {
+    console.error(
+      '[Startup] UYARI: SUPABASE_SERVICE_KEY bir publishable/anon anahtar gibi görünüyor ' +
+      `('${key.slice(0, 15)}...'). Bu anahtar gizli değildir ve RLS'e tabidir. ` +
+      'Supabase → Settings → API Keys üzerinden secret (service_role) anahtarını kullan.'
+    );
+  }
+}
+
 const http = require('http');
 const cron    = require('node-cron');
 const { withCronLock } = require('./utils/cron-lock');

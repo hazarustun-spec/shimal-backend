@@ -284,17 +284,10 @@ setInterval(() => {
 }, 5 * 60 * 1000).unref();
 
 // ─── Session token ───────────────────────────────────────────────────────────
-// Proper rotatable tokens: random bytes + DB-stored SHA-256 hash.
+// Tek geçerli form: random bytes + DB'de saklanan SHA-256 hash.
 // Detaylar: src/utils/session-token.js
-// Legacy HMAC tokens backward-compat için hâlâ destekleniyor.
 
 const sessionTokenModule = require('./session-token');
-
-// Legacy export for code that still imports `generateSessionToken`
-// (eski register handler'ları vs). Sadece fallback için kullanılır.
-function generateSessionToken(deviceId) {
-  return sessionTokenModule.legacyHmacToken(deviceId);
-}
 
 // ─── Ownership check ────────────────────────────────────────────────────────
 // Ensures the requesting device can only access its own data.
@@ -333,16 +326,11 @@ async function checkOwnership(req, res, targetDeviceId) {
     return false;
   }
 
-  const result = await sessionTokenModule.verifyToken(targetDeviceId, clientToken);
-  if (result === false) {
+  // verifyToken artık yalnızca true/false döner — DB'deki hash ile eşleşme
+  // dışında kabul edilen bir token formu yok.
+  if (!(await sessionTokenModule.verifyToken(targetDeviceId, clientToken))) {
     writeJson(res, 401, { error: 'Geçersiz oturum. Lütfen uygulamayı yeniden açın.' });
     return false;
-  }
-  // result === true (random DB token) veya 'legacy' (HMAC fallback) → ikisi de kabul
-  if (result === 'legacy') {
-    // Legacy HMAC kullanıcısı — bu request OK ama client'ı DB token'a upgrade etmek için
-    // bir sonraki register/recover akışında yeni token dönülecek. Şimdilik dokunma.
-    console.log(`[SessionToken] Legacy HMAC token kabul edildi — device=${targetDeviceId.substring(0, 8)}...`);
   }
 
   return true;
@@ -407,7 +395,6 @@ module.exports = {
   checkUserAgent,
   checkOwnership,
   checkCronKey,
-  generateSessionToken,
   writeJson,
   notFound,
   badRequest,
