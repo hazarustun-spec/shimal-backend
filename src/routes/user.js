@@ -319,6 +319,79 @@ async function handleMigrateNatalCharts(req, res) {
   }
 }
 
+// ─── Onboarding anketi ───────────────────────────────────────────────────────
+// İlk açılıştaki "Seni tanıyalım" anketi. Cevapların hepsi doğum haritasından
+// türetilemeyen bilgiler, dolayısıyla günlük yorumu kişiselleştirmek için
+// elimizdeki en ayırt edici sinyaller.
+//
+// Allowlist: gelen değer beklenen kümede değilse sessizce atılır. Bu alanlar
+// doğrudan AI prompt'una giriyor, o yüzden serbest metin kabul edilmiyor —
+// enjeksiyon yüzeyi açmamak için.
+
+const QUIZ_FIELDS = {
+  focus:             new Set(['love', 'career', 'health', 'self']),
+  astrologyLevel:    new Set(['beginner', 'casual', 'advanced']),
+  birthTimeAccuracy: new Set(['exact', 'approximate', 'unsure']),
+  readingTime:       new Set(['morning', 'midday', 'evening']),
+  supportStyle:      new Set(['advice', 'validation', 'understanding', 'space']),
+  lifePhase:         new Set(['starting', 'sustaining', 'ending', 'searching']),
+};
+
+const QUIZ_COLUMN = {
+  focus:             'quiz_focus',
+  astrologyLevel:    'quiz_astrology_level',
+  birthTimeAccuracy: 'quiz_birth_time_accuracy',
+  readingTime:       'quiz_reading_time',
+  supportStyle:      'quiz_support_style',
+  lifePhase:         'quiz_life_phase',
+};
+
+async function handleUpdateQuiz(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    const { deviceId } = body;
+
+    if (!deviceId || !isValidDeviceId(deviceId)) return badRequest(res, 'Geçersiz cihaz kimliği');
+    if (!(await checkOwnership(req, res, deviceId))) return;
+
+    const update = {};
+    const rejected = [];
+    for (const [key, allowed] of Object.entries(QUIZ_FIELDS)) {
+      const value = body[key];
+      if (value === undefined || value === null) continue;
+      if (typeof value === 'string' && allowed.has(value)) {
+        update[QUIZ_COLUMN[key]] = value;
+      } else {
+        rejected.push(key);
+      }
+    }
+
+    if (rejected.length > 0) {
+      console.warn(`[User] Anket: beklenmeyen değer(ler) atlandı → ${rejected.join(', ')}`);
+    }
+
+    // Kullanıcı anketi yarıda bıraktıysa hiç cevap gelmeyebilir; bunu hata
+    // saymıyoruz, sadece yazacak bir şey yok.
+    if (Object.keys(update).length === 0) {
+      return writeJson(res, 200, { success: true, saved: 0 });
+    }
+
+    update.quiz_completed_at = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('users')
+      .update(update)
+      .eq('device_id', deviceId);
+
+    if (error) throw error;
+
+    console.log(`[User] Anket kaydedildi: ${deviceId.substring(0, 8)}... (${Object.keys(update).length - 1} cevap)`);
+    writeJson(res, 200, { success: true, saved: Object.keys(update).length - 1 });
+  } catch (error) {
+    internalError(res, error, '[User] Quiz update error:', 'Anket cevapları kaydedilemedi');
+  }
+}
+
 async function handleUpdateProfile(req, res) {
   try {
     const body = await readJsonBody(req);
@@ -478,6 +551,7 @@ module.exports = [
   ['POST', /^\/api\/user\/register$/, handleUserRegister],
   ['PUT', /^\/api\/user\/push-token$/, handleUserPushToken],
   ['PUT', /^\/api\/user\/profile$/, handleUpdateProfile],
+  ['PUT', /^\/api\/user\/quiz$/, handleUpdateQuiz],
   ['PUT', /^\/api\/user\/premium$/, handleUpdatePremium],
   ['PUT', /^\/api\/user\/refresh-time$/, handleUserRefreshTime],
   ['POST', /^\/api\/user\/delete$/, handleUserDeletePost],

@@ -136,6 +136,19 @@ function buildNatalLines(natalPlanets) {
   return lines;
 }
 
+// Onboarding anketinin cevaplarını users satırından toplar. Hepsi nullable —
+// anketi görmemiş veya yarıda bırakmış kullanıcılarda alanlar boş kalır ve
+// prompt tarafı bunu tolere eder.
+function extractQuiz(user) {
+  return {
+    focus:             user.quiz_focus || null,
+    astrologyLevel:    user.quiz_astrology_level || null,
+    birthTimeAccuracy: user.quiz_birth_time_accuracy || null,
+    supportStyle:      user.quiz_support_style || null,
+    lifePhase:         user.quiz_life_phase || null,
+  };
+}
+
 async function getUserByDeviceId(deviceId) {
   const { data: user, error } = await supabase
     .from('users')
@@ -274,6 +287,7 @@ async function handleDailyGet(req, res, params, url) {
         preferredName:      url.searchParams.get('preferredName') || '',
         birthPlace:         user.birth_place || null,
         yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
+        quiz:               extractQuiz(user),
         feedbackSummary,
         isPremium:          !!user.is_premium,
       });
@@ -491,6 +505,7 @@ async function generateInsightForUser(user, today) {
     preferredName:      user.preferred_name || '',
     birthPlace:         user.birth_place || null,
     yesterdayFocus:     yesterdayInsight?.daily_focus?.short || null,
+    quiz:               extractQuiz(user),
     feedbackSummary,
     isPremium:          !!user.is_premium,
   });

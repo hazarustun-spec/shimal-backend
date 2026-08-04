@@ -157,6 +157,12 @@ async function handleGetPersonality(req, res, params) {
         moonSign: user.moon_sign,
         ascendantSign: natalAsc?.sign || null,
         preferredName: user.preferred_name || '',
+        // Anketten yalnızca kişilik metnini etkileyen ikisi kullanılıyor:
+        // terim yoğunluğu ve doğum saatinin güvenilirliği.
+        quiz: {
+          astrologyLevel:    user.quiz_astrology_level || null,
+          birthTimeAccuracy: user.quiz_birth_time_accuracy || null,
+        },
       });
     } catch (aiError) {
       console.error(`[Personality] AI generation failed: ${aiError.message}`);

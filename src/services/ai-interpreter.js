@@ -385,6 +385,7 @@ async function generateDailyInsight({
   birthPlace,
   yesterdayFocus,
   feedbackSummary,
+  quiz = null,
   isPremium = true, // default true → an accidental omission never degrades a paying user
 }) {
   // Sanitize user-controlled fields before injecting into AI prompt
@@ -415,6 +416,54 @@ async function generateDailyInsight({
       lines.push('→ Bu bölümlerdeki tonu ve derinliği koru — çalışan yaklaşımı sürdür.');
     }
     feedbackLine = lines.join('\n') + '\n';
+  }
+
+  // ── Onboarding anketi ──────────────────────────────────────────────────────
+  // Bu beş alan doğum haritasından TÜRETİLEMEZ. Aynı burçtan iki kullanıcının
+  // birbirine benzeyen yorumlar almasının başlıca sebebi, prompt'un yalnızca
+  // haritadan türeyen verilerle beslenmesiydi: aynı gün + aynı güneş burcu =
+  // neredeyse aynı girdi. Bunlar girdiyi kişi bazında ayrıştırıyor.
+  const QUIZ_TEXT = {
+    focus: {
+      love:   'Şu sıralar en çok aşk ve ilişkileri düşünüyor — aşk bölümünü en somut ve en uzun bölüm yap, diğerlerini kısalt.',
+      career: 'Şu sıralar en çok kariyer ve parayı düşünüyor — kariyer ve para bölümlerini öne çıkar, somut zamanlama ver.',
+      health: 'Şu sıralar en çok sağlık ve enerjiyi düşünüyor — enerji ve sağlık bölümlerini derinleştir, bedensel ritme değin.',
+      self:   'Şu sıralar en çok kendini tanımayı düşünüyor — günlük odağı iç gözleme çevir, davranış kalıplarına ayna tut.',
+    },
+    astrologyLevel: {
+      beginner: 'Astrolojiye yeni — terim kullanma. "Merkür retro" deme, ne hissedeceğini anlat. Sembolü değil sonucu yaz.',
+      casual:   'Astrolojiyi orta düzeyde biliyor — tanıdık terimleri (retro, transit, yükselen) açıklamadan kullanabilirsin, ama cümleyi terime boğma.',
+      advanced: 'Astrolojiyi ileri düzeyde biliyor — ev, açı, orb, derece detaylarını doğrudan kullan. Yüzeysel kalırsan güvenini kaybedersin.',
+    },
+    birthTimeAccuracy: {
+      exact:       'Doğum saati kesin — yükselen ve ev yerleşimlerini güvenle kullan.',
+      approximate: 'Doğum saati yaklaşık — yükselen ve ev yorumlarını temkinli kur, gezegen açılarına daha çok yaslan.',
+      unsure:      'Doğum saati belirsiz — yükselen ve ev yerleşimlerine DAYANMA. Güneş, Ay ve gezegen açılarından konuş.',
+    },
+    supportStyle: {
+      advice:        'Zor günde net tavsiye istiyor — her bölümde yapılabilir tek bir somut eylem söyle. Duygusal yumuşatma yerine yön ver.',
+      validation:    'Zor günde anlaşılmak istiyor — önce hissi adlandır, sonra bağlamı ver. Emir kipinden kaçın.',
+      understanding: 'Zor günde nedenini anlamak istiyor — sebep-sonuç kur, "şu transit şuna yol açıyor" diye açıkla.',
+      space:         'Zor günde alan istiyor — baskı kurma, "şunu yapmalısın" deme. Sakin, alçak sesli, seçenek bırakan bir ton kullan.',
+    },
+    lifePhase: {
+      starting:   'Hayatında bir şeye BAŞLIYOR — ilk adım, momentum ve cesaret temaları öne çıksın.',
+      sustaining: 'Hayatında bir şeyi SÜRDÜRÜYOR — dayanıklılık, ritim ve tükenmeden devam etme temaları öne çıksın.',
+      ending:     'Hayatında bir şeyi BİTİRİYOR — kapanış, bırakma ve yas temalarına yer ver; yeni başlangıç dayatma.',
+      searching:  'Yön ARIYOR, arada kalmış — belirsizliği normalleştir, tek doğru yol dayatma, küçük denemeler öner.',
+    },
+  };
+
+  let quizLine = '';
+  if (quiz) {
+    const parts = [];
+    for (const [field, map] of Object.entries(QUIZ_TEXT)) {
+      const value = quiz[field];
+      if (value && map[value]) parts.push(`- ${map[value]}`);
+    }
+    if (parts.length > 0) {
+      quizLine = `\nKULLANICININ KENDİ BEYANI (haritadan türetilemez — bu kişiyi diğerlerinden ayıran şey budur, MUTLAKA uygula):\n${parts.join('\n')}\n`;
+    }
   }
 
   const relationshipContext = {
@@ -476,8 +525,26 @@ ${natalSummary}
 
 BUGÜNÜN TRANSİTLERİ VE NATAL HARİTAYA OLAN AÇILAR:
 ${transitSummary}
-${yesterdayLine}${feedbackLine}
-${paragraphReminder} Toplam mesajda en fazla 2-3 cümle zorluk/risk olsun, geri kalanı pozitif ve motive edici olsun. Spesifik saat verme, klişe kalıpları tekrarlama.
+${quizLine}${yesterdayLine}${feedbackLine}
+${paragraphReminder} Toplam mesajda en fazla 2-3 cümle zorluk/risk olsun, geri kalanı pozitif ve motive edici olsun. Spesifik saat verme.
+
+AYNILAŞMAYA KARŞI — BU EN ÖNEMLİ KURAL:
+Bu metni aynı gün başka kullanıcılar da alacak. Aralarındaki tek fark natal
+harita ve yukarıdaki kişisel beyanlar. Metnin, burcu aynı olan başka birine
+kopyalanabiliyorsa YANLIŞ yazmışsın demektir.
+
+- Her bölümde, YUKARIDAKİ natal listeden en az bir spesifik yerleşimi adıyla
+  kullan (gezegen + burç + ev, ya da somut bir açı). "Venüs'ün 7. evinde"
+  gibi. Genel burç yorumu yazma.
+- Bugünün transitini o yerleşime BAĞLA. Transit tek başına anlatılırsa herkese
+  aynı şey gider; asıl kişiselleştirme transit × natal kesişimidir.
+- Şu kalıpları KULLANMA: "bugün enerjin yüksek", "içgüdülerine güven",
+  "evrenin sana bir mesajı var", "kendine zaman ayır", "değişime açık ol",
+  "kalbini dinle". Bunlar herkese uyar, dolayısıyla hiç kimseye uymaz.
+- Aynı cevapta iki bölüm birbirine benzemesin. Aşk ve kariyer aynı cümle
+  yapısıyla başlıyorsa yeniden yaz.
+- Somut hayat alanı adlandır (mesaj atmak, toplantı, uyku düzeni, kardeş,
+  fatura, yolculuk) — soyut "enerji/titreşim/akış" dilinden kaçın.
 
 Yalnızca yukarıdaki gerçek astronomik verileri kullanarak JSON içgörüsünü oluştur.`;
 
@@ -618,11 +685,30 @@ const PROFILE_CHUNK_FORMAT = `ÇIKTI FORMATI — Yalnızca geçerli JSON döndü
 /**
  * Generate one-time personality analysis from natal chart
  */
-async function generatePersonalityAnalysis({ natalSummary, gender, relationshipStatus, workStatus, sunSign, moonSign, ascendantSign, preferredName }) {
+async function generatePersonalityAnalysis({ natalSummary, gender, relationshipStatus, workStatus, sunSign, moonSign, ascendantSign, preferredName, quiz = null }) {
   const safeName = sanitizeForAI(preferredName, 50);
   const sunSignTR = toTR(sunSign);
   const moonSignTR = moonSign ? toTR(moonSign) : null;
   const ascendantSignTR = ascendantSign ? toTR(ascendantSign) : null;
+
+  // Anketten yalnızca kişilik metnini gerçekten etkileyen ikisi: terim yoğunluğu
+  // ve doğum saatinin güvenilirliği. Saat belirsizse yükselen/ev yorumlarına
+  // yaslanmak uydurma olur.
+  let quizLine = '';
+  if (quiz) {
+    const parts = [];
+    if (quiz.astrologyLevel === 'beginner') {
+      parts.push('- Astrolojiye yeni: terim kullanma, sembolü değil sonucu anlat.');
+    } else if (quiz.astrologyLevel === 'advanced') {
+      parts.push('- Astrolojiyi ileri düzeyde biliyor: ev, açı ve derece detaylarını doğrudan kullan, yüzeysel kalma.');
+    }
+    if (quiz.birthTimeAccuracy === 'unsure') {
+      parts.push('- Doğum saati belirsiz: yükselen ve EV yerleşimlerine dayanan iddialardan kaçın, gezegen açılarından konuş.');
+    } else if (quiz.birthTimeAccuracy === 'approximate') {
+      parts.push('- Doğum saati yaklaşık: ev yorumlarını temkinli kur.');
+    }
+    if (parts.length > 0) quizLine = `\nKULLANICININ BEYANI (uygula):\n${parts.join('\n')}\n`;
+  }
 
   const userPrompt = `Bu kişinin doğum haritasına dayalı kapsamlı kişilik analizi oluştur.
 
@@ -637,6 +723,21 @@ KİŞİ:
 
 NATAL HARİTA (tüm gezegen konumları, evler, açılar):
 ${natalSummary}
+${quizLine}
+KALIP CÜMLE YASAĞI — EN ÇOK BURADA HATA YAPILIYOR:
+Aynı gezegen aynı burçta olan herkese yazılabilecek bir cümle kurma. Ayırt
+edici olan gezegenin burcu değil, BURÇ + EV + AÇI üçlüsüdür.
+
+- Her gezegen yorumunda o gezegenin EVİNİ ve varsa bir AÇISINI cümlenin içine
+  ör. Yalnız burçtan konuşursan burç yorumu yazmış olursun.
+- Şu boş kalıpları kullanma: "derin bir iç dünyan var", "güçlü bir sezgiye
+  sahipsin", "insanlar sana güvenir", "mükemmeliyetçi olabilirsin",
+  "duygularını içine atarsın". Bunlar herkeste doğru çıkar, dolayısıyla hiçbir
+  şey söylemez.
+- İki gezegen yorumu aynı cümle yapısıyla başlamasın.
+- Çelişkiyi saklama: haritada gerilim varsa (kare, karşıt) bunu bir kişilik
+  çelişkisi olarak yaz. En kişisel kısım budur; herkesi olumlayan metin
+  kimseyi tarif etmez.
 
 Yorumların derin ve kişiye özel olsun. Genel burç yorumu değil — bu kişinin spesifik gezegen-burç-ev kombinasyonuna dayalı benzersiz bir analiz olsun.`;
 
