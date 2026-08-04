@@ -56,7 +56,33 @@ Doğrulama: bir bildirim tetikle ve Railway loglarına bak.
 (Bu iki log satırı `e55b840` ile eklendi. Öncesinde başarısız çağrılar da
 "Sent" olarak loglanıyordu, arızanın fark edilmeme sebebi buydu.)
 
-## 3. SUPABASE_SERVICE_KEY — en riskli
+## 3. SUPABASE_SERVICE_KEY — TAMAMLANDI (4 Ağu 2026)
+
+Aşağıdaki teşhis ve düzeltme yapıldı. Özet:
+
+- Railway'deki değer `sb_secret_…` ile değiştirildi; `[Startup] UYARI` satırı
+  boot logundan kayboldu.
+- RLS on tabloda da zaten açıktı, ama **iki tablo `public` rolüne
+  `qual = true` ile tamamen açıktı** — yani publishable anahtarı olan herkes
+  ALL yetkisine sahipti:
+  - `users` → `Service role full access to users`
+  - `daily_insights` → `Service role full access to daily_insights`
+
+  Adları "service role" diyordu ama `TO public` olarak yazılmışlardı.
+  İkisi de düşürüldü; her iki tabloda doğru olan `*_service_role_only`
+  politikası zaten vardı.
+- `feedback` de `{public}` görünüyor ama `qual`'ı JWT rol kontrolü yapıyor —
+  doğru desen, dokunulmadı.
+- Backend `service_role` ile doğrulandı: register (INSERT), `/api/user`
+  (SELECT), `/api/daily` (INSERT + Gemini + cache SELECT), DELETE — hepsi 200.
+
+**Kalan:** eski publishable anahtar hâlâ geçerli ve konuşma kaydında.
+Supabase panelinden döndürülmeli.
+
+<details>
+<summary>Orijinal teşhis notları</summary>
+
+
 
 **Sorun:** değer `sb_publishable_H10Ik…` ile başlıyor. Bu, tarayıcıya
 konulmak üzere tasarlanmış **anon/publishable** anahtar; gizli sayılmaz ve
@@ -102,6 +128,8 @@ Deploy sonrası boot logunda şu satır **görünmemeli**:
 ```
 [Startup] UYARI: SUPABASE_SERVICE_KEY bir publishable/anon anahtar gibi görünüyor
 ```
+
+</details>
 
 ---
 
