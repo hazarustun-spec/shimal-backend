@@ -30,7 +30,38 @@ railway variable set SHIMAL_SESSION_SECRET="$(openssl rand -hex 32)"
 railway redeploy --yes
 ```
 
-## 2. ONESIGNAL_API_KEY
+## 2. ONESIGNAL_API_KEY — TAMAMLANDI (4 Ağu 2026)
+
+Yeni bir REST anahtarı üretildi (`os_v2_app_…`, 113 karakter) ve Railway'e
+`--stdin` ile yazıldı; placeholder gitti.
+
+Doğrulananlar:
+
+- `Basic`, `Key`, `Bearer` şemalarının üçü de OneSignal tarafından kabul
+  ediliyor → koddaki `Basic` doğru, değişiklik gerekmedi.
+- Uygulamada **69 kayıtlı cihaz, 37 mesaj alabilir**, APNs sertifikası
+  `production` ortamında. Yani token kaydı hep çalışıyormuş; kırık olan
+  yalnızca gönderme tarafıydı.
+- Gönderim ucu var olmayan bir player ID ile denendi (kimseye bildirim
+  gitmedi): kimlik doğrulaması ve payload şekli kabul edildi.
+
+O test sırasında düzeltmenin eksik olduğu görüldü — bkz. commit `8704fb4`:
+OneSignal teslim edilemeyen gönderimi HTTP **200** ile döndürüyor
+(`{"id":"","errors":[...]}`), yani `response.ok` kontrolü aboneliği düşmüş
+kullanıcıları hâlâ "Sent" olarak logluyordu. Artık boş `id` / sıfır
+`recipients` de başarısızlık sayılıyor.
+
+**Kalan:** uçtan uca teslimat (gerçek cihaza bildirim düşüyor mu) test
+edilmedi — 37 gerçek cihaza test bildirimi göndermemek için. Cihaz turunda
+(gönderim listesi adım 3) doğrulanacak.
+
+Eski `render` adlı anahtar ve Legacy API Key hâlâ etkin ama kullanılmıyor;
+OneSignal panelinden kapatılabilir.
+
+<details>
+<summary>Orijinal notlar</summary>
+
+
 
 **Sorun:** değer literal `your-onesignal-rest-api-key` — `.env.example`'dan
 kopyalanıp doldurulmamış. Yani push bildirimleri üretimde **hiç çalışmıyor**.
@@ -55,6 +86,8 @@ Doğrulama: bir bildirim tetikle ve Railway loglarına bak.
 
 (Bu iki log satırı `e55b840` ile eklendi. Öncesinde başarısız çağrılar da
 "Sent" olarak loglanıyordu, arızanın fark edilmeme sebebi buydu.)
+
+</details>
 
 ## 3. SUPABASE_SERVICE_KEY — TAMAMLANDI (4 Ağu 2026)
 
