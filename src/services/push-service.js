@@ -57,12 +57,18 @@ async function sendPushNotification(playerId, message, heading = 'Shimal', data 
 
     const result = await response.json();
 
-    // response.ok kontrol edilmiyordu: OneSignal 401/400 dönse bile aşağıdaki
-    // satır "Sent" yazıyordu. Bildirimlerin uzun süre sessizce ölü kalmasının
-    // sebebi buydu.
-    if (!response.ok) {
+    // Durum kodu tek başına yetmiyor. OneSignal teslim edilemeyen gönderimleri
+    // de HTTP 200 ile döndürüyor; gövdede `errors` olur ve `id` boş gelir:
+    //   200 {"id":"","errors":["All included players are not subscribed"]}
+    // Cihaz aboneliği düşmüş her kullanıcı bu yola giriyor, yani sadece
+    // response.ok'a bakmak bunları "Sent" olarak loglardı.
+    //
+    // Tek alıcıya gönderiyoruz, dolayısıyla boş `id` veya sıfır `recipients`
+    // "hiçbir şey gitmedi" demek.
+    const delivered = response.ok && result?.id && result?.recipients !== 0;
+    if (!delivered) {
       console.error(
-        `[Push] OneSignal reddetti (HTTP ${response.status}): ` +
+        `[Push] Gönderilemedi (HTTP ${response.status}) player=${playerId}: ` +
         `${JSON.stringify(result?.errors || result).substring(0, 200)}`
       );
       return null;
