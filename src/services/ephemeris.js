@@ -5,8 +5,30 @@ let swissEphemerisLoadError = null;
 
 try {
   swisseph = require('swisseph');
-  // Use Moshier mode so the native module does not depend on external ephemeris files.
-  swisseph.swe_set_ephe_path('');
+
+  // Boş yol veriliyordu. Bu, Moshier moduna geçmek yerine kütüphanenin
+  // varsayılan arama yoluna ('.:/users/ephe2/:/users/ephe/') düşmesine yol
+  // açıyordu — üretimde var olmayan dizinler. Ana gezegenler dahili Moshier
+  // hesabıyla yine doğru çıkıyordu, ama Chiron gibi asteroitler .se1 dosyası
+  // ZORUNLU olduğu için hesaplanamıyor ve sentetik fallback modeline
+  // düşüyorlardı:
+  //
+  //   [Ephemeris] SwissEph failed for Chiron, using fallback:
+  //   SwissEph file 'seas_18.se1' not found in PATH '.:/users/ephe2/:/users/ephe/'
+  //
+  // O fallback gerçek bir efemeris değil — baseLongitude + dailyMotion*gün +
+  // sinüs dalgalanması. Yani Chiron burcu uydurmaydı, üstelik hem kişilik
+  // analizinde ayrı bölüm olarak yorumlanıyor hem de günlük prompt'ta
+  // "Chiron yarası" diye geçiyor.
+  //
+  // Dosyalar zaten paketle geliyor (node_modules/swisseph/ephe/), yalnızca
+  // yolu göstermek gerekiyordu.
+  const ephePath = require('path').join(
+    require('path').dirname(require.resolve('swisseph/package.json')),
+    'ephe'
+  );
+  swisseph.swe_set_ephe_path(ephePath);
+  console.log(`[Ephemeris] Swiss Ephemeris veri yolu: ${ephePath}`);
 } catch (error) {
   swissEphemerisLoadError = error;
   console.warn(
