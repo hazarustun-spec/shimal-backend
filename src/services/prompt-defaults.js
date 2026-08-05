@@ -93,6 +93,20 @@ GÜNLÜK ODAK — Shimal'in kişisel mesajı:
 - "detail" (3 paragraf): 1) Bugünün enerjisi ve kişinin ruh hali. 2) Bugün için bir dost tavsiyesi veya farkındalık. 3) PREMIUM — natal haritadan gelen derin kişisel içgörü, Chiron yarası, Kuzey Düğüm yönü, gizli güç veya zayıflık.
 - "suggestion": Bugün yapması gereken tek somut şey.
 
+BİLDİRİM — ÇOK ÖNEMLİ, AYRI DÜŞÜN:
+"notification" alanı bir davet DEĞİL, kendi başına okunduğunda tamamlanmış bir
+mikro-içerik. Kullanıcı bildirimi görüp uygulamayı hiç açmadan da bir şey
+almış olmalı — hatta ekran görüntüsü alıp paylaşmak isteyecek kadar iyi olmalı.
+- Spesifik ve somut ol. Bugünün transitinden gerçek bir imge çıkar.
+- "Bugünkü yorumun hazır", "İçgörülerine göz at", "Kozmik rehberliğin seni
+  bekliyor" gibi içi boş davetleri ASLA yazma. Bunlar hiçbir şey söylemez.
+- Tek çarpıcı cümle. Bir dost gibi, ama bu cümle akılda kalmalı.
+- İYİ: "Bugün 'hayır' demek, uzun vadeli bir 'evet' kuruyor.", "Ay bugün senin
+  tarafında — söylemek istediğin şeyi söyle.", "İçin rahat değilse sebebi var;
+  bugün onu görmezden gelme."
+- KÖTÜ: "Günlük yorumun hazır!", "Bugün seni neler bekliyor?", "Uygulamayı aç
+  ve keşfet."
+
 AY BURCU: Natal Ay burcu duygusal tepkileri renklendirir. Transit Ay günlük ruh halini etkiler.
 YÜKSELEN BURÇ: Kişinin dış dünyaya yansıttığı enerji, fiziksel enerji. Verilmemişse bu kısmı atla.
 
@@ -153,7 +167,7 @@ SÜREKLİLİK: Dünkü odak verilmişse enerji değişimini 1 cümle ile kabul e
     "dos": ["tam 3 madde, 2-4 kelime, bugüne özel somut eylem"],
     "donts": ["tam 3 madde, 2-4 kelime, bugüne özel kaçınma"]
   },
-  "notification": "merak uyandıran push bildirim metni (maks 140 karakter) — uygulamayı açtıracak"
+  "notification": "tek başına okunduğunda tamamlanmış, spesifik, akılda kalıcı tek cümle (maks 140 karakter) — davet değil, mikro-içerik. Bugünün transitinden gerçek bir imge taşısın."
 }`;
 
 // ─── Kişilik analizi kuralları ───────────────────────────────────────────────

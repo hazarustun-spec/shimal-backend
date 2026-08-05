@@ -454,13 +454,27 @@ cron.schedule('* * * * *', async () => {
         .eq('date', today);
       const insightMap = Object.fromEntries((insights || []).map(r => [r.user_id, r.notification_text]));
 
+      // AI bildirimi (notification_text) tamamlanmış tek cümledir ve öncelikli.
+      // Yalnız o günün içgörüsü hiç üretilememişse aşağıdaki yedeğe düşülür.
+      // Eski yedek "bugünkü rehberliğin hazır" bir davetti; bunlar en azından
+      // kendi başına okunabilir. Gerçek transit imgesi taşıyamazlar (AI yok),
+      // ama davet gibi de durmazlar. Tarihe göre deterministik seçilir ki aynı
+      // gün herkese aynı yedek gitsin.
+      const FALLBACK_NOTIFS = [
+        'Bugün acele etmeyen kazanır. Bir nefes, sonra devam.',
+        'İçin rahat değilse sebebi var; bugün onu görmezden gelme.',
+        'Küçük bir "hayır", bugün sana alan açabilir.',
+        'Bugün duyduğun ilk sezgi genelde en dürüst olanıdır.',
+        'Ertelediğin o tek şey, bugün beklediğinden kolay.',
+      ];
+      const fbIndex = Number(today.replace(/-/g, '')) % FALLBACK_NOTIFS.length;
+
       await Promise.allSettled(morningDue.map(async (user) => {
         try {
           const name    = user.preferred_name || '';
           const notifTxt = insightMap[user.id];
-          const body    = notifTxt || (name
-            ? `${name}, bugünkü kozmik rehberliğin hazır. 🌅`
-            : 'Bugünkü kozmik rehberliğiniz hazır. 🌅');
+          const fallback = FALLBACK_NOTIFS[fbIndex];
+          const body    = notifTxt || (name ? `${name}, ${fallback.charAt(0).toLowerCase()}${fallback.slice(1)}` : fallback);
           const heading = name ? `Shimal · ${name}` : 'Shimal';
           await sendPushNotification(user.push_token, body, heading, { type: 'daily_insight', date: today });
           pushSent.morning.add(user.id);
