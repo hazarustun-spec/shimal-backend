@@ -230,6 +230,38 @@ canvas{display:block;width:100%!important}
 .event-amount{color:var(--green);font-weight:700;width:70px;text-align:right;flex-shrink:0}
 .event-time{color:var(--muted);flex-shrink:0}
 
+/* ── Prompts tab ── */
+.prompt-layout{display:grid;grid-template-columns:270px 1fr;gap:12px;align-items:start}
+@media(max-width:800px){.prompt-layout{grid-template-columns:1fr}}
+.prompt-list{display:flex;flex-direction:column;gap:6px}
+.prompt-item{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;cursor:pointer;text-align:left;color:var(--text);width:100%;transition:all .15s;font-family:var(--font)}
+.prompt-item:hover{border-color:var(--accent)}
+.prompt-item.active{border-color:var(--accent);background:rgba(201,168,76,.07)}
+.prompt-item-title{font-size:13px;font-weight:600;margin-bottom:5px}
+.prompt-item-meta{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.prompt-hint{font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px}
+.prompt-warn{font-size:12px;color:var(--accent);background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:8px;padding:9px 12px;margin-bottom:10px;line-height:1.5}
+.prompt-token{font-family:monospace;font-size:10px;background:rgba(255,255,255,.04);padding:1px 5px;border-radius:3px;color:var(--muted)}
+.prompt-ta{width:100%;min-height:440px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px 15px;color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.6;outline:none;resize:vertical}
+.prompt-ta:focus{border-color:var(--accent)}
+.prompt-note-in{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:12px;outline:none;margin-top:8px}
+.prompt-note-in:focus{border-color:var(--accent)}
+.prompt-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.btn{border:1px solid var(--border);background:var(--card2);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;font-family:var(--font)}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn-primary{background:var(--accent);color:#0d0f14;border-color:var(--accent)}
+.btn-danger{color:var(--red)}
+.btn-sm{padding:4px 10px;font-size:11px}
+.prompt-msg{font-size:12px;min-height:17px;margin-top:8px;line-height:1.5}
+.prompt-msg.ok{color:var(--green)}
+.prompt-msg.err{color:var(--red)}
+.ver-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap}
+.ver-row:last-child{border-bottom:none}
+.ver-num{color:var(--accent);font-weight:700;width:46px;flex-shrink:0}
+.ver-time{color:var(--muted);width:130px;flex-shrink:0}
+.ver-note{color:var(--muted);flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis}
+
 /* ── Architecture tab ── */
 #arch-svg-wrap svg{display:block;margin:0 auto}
 #arch-svg-wrap .svg-box{cursor:pointer;transition:filter .2s}
@@ -313,6 +345,7 @@ canvas{display:block;width:100%!important}
         <button class="tab" onclick="switchTab('users',this)">Kullanıcılar</button>
         <button class="tab" onclick="switchTab('system',this)">Sistem</button>
         <button class="tab" onclick="switchTab('feedback',this)">Geri Bildirim</button>
+        <button class="tab" onclick="switchTab('prompts',this)">Prompt'lar</button>
         <button class="tab" onclick="switchTab('links',this)">Kısayollar</button>
         <button class="tab" onclick="switchTab('architecture',this)">Mimari</button>
       </nav>
@@ -415,6 +448,9 @@ function switchTab(name, el) {
   }
   if (name === 'architecture') {
     requestAnimationFrame(() => renderArchSVG());
+  }
+  if (name === 'prompts' && !promptState) {
+    loadPrompts();
   }
 }
 
@@ -803,6 +839,164 @@ function usersSearchDebounce(val) {
   _usersDebounce = setTimeout(() => { usersSearch = val; usersPage = 1; loadUsers(); }, 400);
 }
 
+// ─── Prompt'lar ───────────────────────────────────────────────────────────────
+// Prompt metinleri veritabanında sürümlenir. Kayıt yoksa veya okunamıyorsa
+// backend koddaki varsayılana döner, yani buradan yapılan hatalı bir düzenleme
+// üretimi durdurmaz — en fazla eski metne dönülür.
+
+let promptState = null;   // [{key,label,description,content,source,version,...}]
+let promptActive = null;  // seçili prompt'un key'i
+
+function renderPrompts() {
+  return `<div class="tab-panel" id="tab-prompts">
+    <div class="prompt-warn">
+      Buradaki metinler kullanıcıya giden yorumları doğrudan üretir. Kaydettiğin an
+      geçerli olur. Bir şey ters giderse "Varsayılana dön" ile koddaki sürüme
+      geri alabilirsin.
+    </div>
+    <div id="prompt-root"><div class="loading"><span class="spinner"></span>Yükleniyor...</div></div>
+  </div>`;
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'x-dashboard-token': token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (r.status === 401) { logout(); throw new Error('Oturum sona erdi'); }
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'İşlem başarısız');
+  return d;
+}
+
+async function loadPrompts() {
+  const root = document.getElementById('prompt-root');
+  if (!root) return;
+  root.innerHTML = '<div class="loading"><span class="spinner"></span></div>';
+  try {
+    const d = await apiFetch('/dashboard/prompts');
+    promptState = d.prompts || [];
+    if (!promptActive && promptState.length) promptActive = promptState[0].key;
+    drawPrompts();
+  } catch (e) {
+    root.innerHTML = emptyState('Prompt listesi alınamadı: ' + esc(e.message));
+  }
+}
+
+function drawPrompts() {
+  const root = document.getElementById('prompt-root');
+  if (!root || !promptState) return;
+  const p = promptState.find(x => x.key === promptActive) || promptState[0];
+  if (!p) { root.innerHTML = emptyState('Tanımlı prompt yok'); return; }
+
+  const list = promptState.map(x => {
+    const custom = x.source !== 'default';
+    return `<button class="prompt-item ${x.key === p.key ? 'active' : ''}" onclick="selectPrompt('${esc(x.key)}')">
+      <div class="prompt-item-title">${esc(x.label)}</div>
+      <div class="prompt-item-meta">
+        <span class="prompt-token">${custom ? 'düzenlenmiş' : 'varsayılan'}</span>
+        ${x.version ? `<span class="prompt-token">v${esc(String(x.version))}</span>` : ''}
+        <span>${fmt((x.content || '').length)} krkt</span>
+      </div>
+    </button>`;
+  }).join('');
+
+  const tokens = (p.requiredTokens || []).map(t => `<span class="prompt-token">${esc(t)}</span>`).join(' ');
+
+  root.innerHTML = `<div class="prompt-layout">
+    <div class="prompt-list">${list}</div>
+    <div>
+      <div class="prompt-hint">
+        <strong>${esc(p.label)}</strong><br>${esc(p.description)}<br>
+        Uzunluk ${fmt(p.minLength)}–${fmt(p.maxLength)} karakter.
+        ${tokens ? `<br>Şu ifadeler metinde <strong>kalmalı</strong>, silinirse kaydedilmez:<br>${tokens}` : ''}
+      </div>
+      ${p.warning ? `<div class="prompt-warn">${esc(p.warning)}</div>` : ''}
+      <textarea class="prompt-ta" id="prompt-ta" spellcheck="false">${esc(p.content || '')}</textarea>
+      <input class="prompt-note-in" id="prompt-note" placeholder="Bu değişiklik neden yapıldı? (geçmişte görünür)">
+      <div class="prompt-actions">
+        <button class="btn btn-primary" onclick="savePromptNow()">Kaydet</button>
+        <button class="btn" onclick="loadPromptHistory()">Geçmiş</button>
+        <button class="btn btn-danger" onclick="resetPromptNow()">Varsayılana dön</button>
+      </div>
+      <div class="prompt-msg" id="prompt-msg"></div>
+      <div id="prompt-history"></div>
+    </div>
+  </div>`;
+}
+
+function selectPrompt(key) {
+  promptActive = key;
+  drawPrompts();
+}
+
+function promptMsg(text, ok) {
+  const el = document.getElementById('prompt-msg');
+  if (el) { el.className = 'prompt-msg ' + (ok ? 'ok' : 'err'); el.textContent = text; }
+}
+
+async function savePromptNow() {
+  const ta = document.getElementById('prompt-ta');
+  const note = document.getElementById('prompt-note');
+  if (!ta) return;
+  promptMsg('Kaydediliyor...', true);
+  try {
+    const d = await apiPost('/dashboard/prompts/save', {
+      key: promptActive, content: ta.value, note: note ? note.value : '',
+    });
+    promptMsg(`Kaydedildi${d.version ? ' — sürüm ' + d.version : ''}. Yeni yorumlarda geçerli.`, true);
+    promptState = null;
+    await loadPrompts();
+  } catch (e) { promptMsg(e.message, false); }
+}
+
+async function resetPromptNow() {
+  if (!confirm('Koddaki varsayılan metne dönülecek. Emin misin?')) return;
+  promptMsg('Geri alınıyor...', true);
+  try {
+    await apiPost('/dashboard/prompts/reset', { key: promptActive });
+    promptMsg('Varsayılana dönüldü.', true);
+    promptState = null;
+    await loadPrompts();
+  } catch (e) { promptMsg(e.message, false); }
+}
+
+async function loadPromptHistory() {
+  const box = document.getElementById('prompt-history');
+  if (!box) return;
+  box.innerHTML = '<div class="loading"><span class="spinner"></span></div>';
+  try {
+    const d = await apiFetch(`/dashboard/prompts/history?key=${encodeURIComponent(promptActive)}`);
+    const vs = d.versions || [];
+    if (!vs.length) {
+      box.innerHTML = `<div class="prompt-hint" style="margin-top:12px">${esc(d.warning || 'Henüz kayıtlı sürüm yok.')}</div>`;
+      return;
+    }
+    box.innerHTML = `<div class="prompt-list" style="margin-top:12px">` + vs.map(v => `
+      <div class="prompt-item">
+        <div class="prompt-item-title">Sürüm ${esc(String(v.version))}${v.note ? ' — ' + esc(v.note) : ''}</div>
+        <div class="prompt-item-meta">
+          <span>${esc(new Date(v.created_at || v.createdAt).toLocaleString('tr-TR'))}</span>
+          <button class="btn btn-sm" onclick="revertPromptTo(${esc(String(v.version))})">Bu sürüme dön</button>
+        </div>
+      </div>`).join('') + `</div>`;
+  } catch (e) {
+    box.innerHTML = `<div class="prompt-msg err">${esc(e.message)}</div>`;
+  }
+}
+
+async function revertPromptTo(version) {
+  if (!confirm(`Sürüm ${version} geri yüklenecek. Emin misin?`)) return;
+  promptMsg('Geri alınıyor...', true);
+  try {
+    await apiPost('/dashboard/prompts/revert', { key: promptActive, version });
+    promptMsg(`Sürüm ${version} geri yüklendi.`, true);
+    promptState = null;
+    await loadPrompts();
+  } catch (e) { promptMsg(e.message, false); }
+}
+
 async function loadUsers() {
   const wrap = document.getElementById('users-table-wrap');
   if (!wrap) return;
@@ -924,7 +1118,7 @@ function renderAll(stats, trend) {
 
   // Render all panels
   const content = document.getElementById('content');
-  content.innerHTML = renderOverview() + renderRevenue() + renderMonetization() + renderUsers() + renderSystem() + renderFeedback() + renderLinks() + renderArchitecture();
+  content.innerHTML = renderOverview() + renderRevenue() + renderMonetization() + renderUsers() + renderSystem() + renderFeedback() + renderPrompts() + renderLinks() + renderArchitecture();
 
   // Activate the correct tab panel
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));

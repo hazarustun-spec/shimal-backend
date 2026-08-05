@@ -7,12 +7,19 @@
  * POST /dashboard/login            → şifre doğrulama, token döner
  * GET  /dashboard/stats            → tüm metrikler (JSON)
  * GET  /dashboard/stats/insights   → 30 günlük insight trendi
+ * GET  /dashboard/prompts          → düzenlenebilir AI prompt'ları + durumları
+ * GET  /dashboard/prompts/history  → bir prompt'un sürüm geçmişi
+ * GET  /dashboard/prompts/version  → belirli bir sürümün tam metni
+ * POST /dashboard/prompts/save     → yeni sürüm kaydet
+ * POST /dashboard/prompts/revert   → eski sürümü yeni sürüm olarak geri getir
+ * POST /dashboard/prompts/reset    → koddaki varsayılana dön
  */
 
 const crypto = require('crypto');
 const path   = require('path');
 const fs     = require('fs');
 const supabase = require('../config/supabase');
+const promptStore = require('../services/prompt-store');
 const { writeJson } = require('../utils/http');
 
 function dashboardCorsOrigin() {
@@ -1016,6 +1023,125 @@ async function handleExtendedStats(req, res) {
   writeJson(res, 200, { revenue, cron: cronStats, cohort });
 }
 
+// ─── Prompt editor ───────────────────────────────────────────────────────────
+// AI prompt'ları sürümlenmiş olarak DB'de tutuluyor (sql/010_prompts.sql).
+// Buradaki uçlar yalnızca panelden erişilir; kimlik doğrulama mevcut HMAC
+// token mekanizmasının aynısıdır (checkDashboardAuth).
+
+const PROMPT_BODY_LIMIT = 200_000; // ~200 KB — en uzun prompt bunun onda biri
+
+function readJsonBody(req, limit = PROMPT_BODY_LIMIT) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    let aborted = false;
+    req.on('data', (chunk) => {
+      if (aborted) return;
+      body += chunk;
+      if (body.length > limit) {
+        aborted = true;
+        reject(new Error('İstek gövdesi çok büyük'));
+        req.destroy();
+      }
+    });
+    req.on('end', () => {
+      if (aborted) return;
+      try { resolve(body ? JSON.parse(body) : {}); }
+      catch { reject(new Error('Geçersiz JSON gövdesi')); }
+    });
+    req.on('error', (err) => { if (!aborted) reject(err); });
+  });
+}
+
+async function handlePromptsList(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', dashboardCorsOrigin());
+  if (!checkDashboardAuth(req, res)) return;
+  try {
+    writeJson(res, 200, { prompts: await promptStore.listPromptState() });
+  } catch (err) {
+    logError('prompts', err.message);
+    writeJson(res, 500, { error: 'Prompt listesi alınamadı' });
+  }
+}
+
+async function handlePromptHistory(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', dashboardCorsOrigin());
+  if (!checkDashboardAuth(req, res)) return;
+  const key = new URL(req.url, 'http://x').searchParams.get('key') || '';
+  if (!promptStore.getPromptMeta(key)) { writeJson(res, 400, { error: 'Bilinmeyen prompt anahtarı' }); return; }
+  try {
+    writeJson(res, 200, { key, versions: await promptStore.getHistory(key) });
+  } catch (err) {
+    // Geçmiş okunamaması düzenlemeyi engellememeli — boş liste + uyarı dön.
+    logError('prompts-history', err.message);
+    writeJson(res, 200, { key, versions: [], warning: `Geçmiş okunamadı: ${err.message}` });
+  }
+}
+
+async function handlePromptVersion(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', dashboardCorsOrigin());
+  if (!checkDashboardAuth(req, res)) return;
+  const params = new URL(req.url, 'http://x').searchParams;
+  const key = params.get('key') || '';
+  if (!promptStore.getPromptMeta(key)) { writeJson(res, 400, { error: 'Bilinmeyen prompt anahtarı' }); return; }
+  try {
+    writeJson(res, 200, await promptStore.getVersionContent(key, params.get('version')));
+  } catch (err) {
+    writeJson(res, 400, { error: err.message });
+  }
+}
+
+async function handlePromptSave(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', dashboardCorsOrigin());
+  if (!checkDashboardAuth(req, res)) return;
+  let body;
+  try { body = await readJsonBody(req); }
+  catch (err) { writeJson(res, 400, { error: err.message }); return; }
+
+  try {
+    const result = await promptStore.savePrompt(body.key, body.content, { note: body.note });
+    writeJson(res, 200, { ok: true, ...result });
+  } catch (err) {
+    // Doğrulama hatası kullanıcı hatasıdır (400); diğerleri sunucu tarafı (500).
+    if (err.validation) { writeJson(res, 400, { error: err.message }); return; }
+    logError('prompts-save', err.message);
+    writeJson(res, 500, { error: `Kaydedilemedi: ${err.message}` });
+  }
+}
+
+async function handlePromptRevert(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', dashboardCorsOrigin());
+  if (!checkDashboardAuth(req, res)) return;
+  let body;
+  try { body = await readJsonBody(req); }
+  catch (err) { writeJson(res, 400, { error: err.message }); return; }
+
+  try {
+    const result = await promptStore.revertPrompt(body.key, body.version);
+    writeJson(res, 200, { ok: true, ...result });
+  } catch (err) {
+    if (err.validation) { writeJson(res, 400, { error: err.message }); return; }
+    logError('prompts-revert', err.message);
+    writeJson(res, 500, { error: `Geri alınamadı: ${err.message}` });
+  }
+}
+
+async function handlePromptReset(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', dashboardCorsOrigin());
+  if (!checkDashboardAuth(req, res)) return;
+  let body;
+  try { body = await readJsonBody(req); }
+  catch (err) { writeJson(res, 400, { error: err.message }); return; }
+
+  try {
+    const result = await promptStore.resetPrompt(body.key);
+    writeJson(res, 200, { ok: true, ...result });
+  } catch (err) {
+    if (err.validation) { writeJson(res, 400, { error: err.message }); return; }
+    logError('prompts-reset', err.message);
+    writeJson(res, 500, { error: `Varsayılana dönülemedi: ${err.message}` });
+  }
+}
+
 module.exports = [
   ['GET',     /^\/dashboard$/,                    handleDashboardHtml],
   ['POST',    /^\/dashboard\/login$/,              handleLogin],
@@ -1023,6 +1149,12 @@ module.exports = [
   ['GET',     /^\/dashboard\/stats\/insights$/,    handleInsightTrend],
   ['GET',     /^\/dashboard\/stats\/extended$/,    handleExtendedStats],
   ['GET',     /^\/dashboard\/stats\/users$/,       handleUsersList],
+  ['GET',     /^\/dashboard\/prompts$/,            handlePromptsList],
+  ['GET',     /^\/dashboard\/prompts\/history$/,   handlePromptHistory],
+  ['GET',     /^\/dashboard\/prompts\/version$/,   handlePromptVersion],
+  ['POST',    /^\/dashboard\/prompts\/save$/,      handlePromptSave],
+  ['POST',    /^\/dashboard\/prompts\/revert$/,    handlePromptRevert],
+  ['POST',    /^\/dashboard\/prompts\/reset$/,     handlePromptReset],
   ['OPTIONS', /^\/dashboard/,                      handleOptions],
 ];
 
