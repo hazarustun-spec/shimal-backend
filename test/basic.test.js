@@ -80,6 +80,53 @@ assert(keyMatches(KEY_A, '') === false, 'empty client key rejected');
 assert(keyMatches(KEY_A, 'a'.repeat(63) + 'b') === false, 'single trailing char difference rejected');
 assert(keyMatches(KEY_A, 'b' + 'a'.repeat(63)) === false, 'single leading char difference rejected');
 
+// ─── AI cevabı ayrıştırma ────────────────────────────────────────────────────
+// Üretimde en sık görülen hata buydu: model JSON'dan sonra açıklama yazıyor,
+// eski `/\{[\s\S]*\}/` deseni son `}`'e kadar her şeyi alıp çöküyordu. Sonuç,
+// kullanıcının haritasıyla ilgisi olmayan genel fallback metnini görmesiydi.
+console.log('--- ai-interpreter.parseJSONResponse ---');
+const { parseJSONResponse, extractBalancedJSON } = require('../src/services/ai-interpreter');
+
+assert(parseJSONResponse('{"a":1}').a === 1, 'düz JSON ayrıştırılır');
+
+assert(
+  parseJSONResponse('```json\n{"a":1}\n```').a === 1,
+  'markdown fence içindeki JSON ayrıştırılır'
+);
+
+// Asıl regresyon: JSON'dan sonra gelen ve içinde } geçen açıklama metni.
+assert(
+  parseJSONResponse('{"a":1}\n\nUmarım bu yardımcı olur {tebrikler}').a === 1,
+  'JSON sonrası süslü parantez içeren metin yok sayılır'
+);
+
+// String içindeki süslü parantez derinliği bozmamalı.
+assert(
+  parseJSONResponse('{"a":"} kapanis degil","b":2}').b === 2,
+  'string içindeki } sayaç bozmaz'
+);
+
+// Kaçışlı tırnak string sınırını bozmamalı.
+assert(
+  parseJSONResponse('{"a":"tirnak \\" icinde","b":3}').b === 3,
+  'kaçışlı tırnak string sınırını bozmaz'
+);
+
+// İç içe nesne varken ilk dengeli nesne alınmalı.
+assert(
+  parseJSONResponse('{"a":{"b":{"c":4}}} sonrasi cop }').a.b.c === 4,
+  'iç içe nesnelerde doğru kapanış bulunur'
+);
+
+assert(extractBalancedJSON('yok') === null, 'süslü parantez yoksa null döner');
+
+// Kesilmiş cevap onarım yoluna düşmeli, hata fırlatmamalı.
+{
+  let repaired = null;
+  try { repaired = parseJSONResponse('{"a":1,"b":"yarim'); } catch (_) { repaired = null; }
+  assert(repaired !== null && repaired.a === 1, 'kesilmiş JSON onarılır');
+}
+
 // ─── Ownership check (fail-closed) ───────────────────────────────────────────
 // Bu uç noktalar eskiden session token'ı opsiyonel sayıyordu: token yoksa
 // uyarı basılıp istek GEÇİRİLİYORDU. API anahtarı her IPA'nın içinde gittiği

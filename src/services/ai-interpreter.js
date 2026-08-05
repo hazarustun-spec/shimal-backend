@@ -181,12 +181,52 @@ function withTimeout(promise, ms) {
   ]);
 }
 
+/**
+ * Metindeki İLK dengeli JSON nesnesini çıkarır.
+ *
+ * Eski yöntem `/\{[\s\S]*\}/` idi: ilk `{`'ten SON `}`'e kadar her şeyi
+ * alıyordu. Model JSON'dan sonra açıklama yazdığında ve o açıklamada bir `}`
+ * geçtiğinde, eşleşen metin geçerli JSON'ın ötesine taşıyor ve ayrıştırma
+ * "Unexpected non-whitespace character after JSON" ile çöküyordu. Üretim
+ * loglarında en sık görülen hata buydu; denemeler tükenince kullanıcı
+ * haritasıyla ilgisi olmayan genel fallback metnini alıyordu.
+ *
+ * Süslü parantezleri sayarken string içindekileri ve kaçışlı karakterleri
+ * atlıyor, sayaç sıfıra döndüğü yerde kesiyor.
+ */
+function extractBalancedJSON(text) {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+
+  // Dengelenmedi → cevap kesilmiş. Kalanı döndür, aşağıdaki onarım denesin.
+  return text.slice(start);
+}
+
 function parseJSONResponse(text) {
   try {
     return JSON.parse(text);
   } catch (parseError) {
-    // Try to extract JSON from markdown fences or surrounding text
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const balanced = extractBalancedJSON(text);
+    const jsonMatch = balanced ? [balanced] : null;
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[0]);
@@ -795,4 +835,7 @@ module.exports = {
   generateDailyInsight,
   generatePersonalityAnalysis,
   buildFallbackInsight,
+  // Test için: model cevabını ayrıştırmak üretimdeki en kırılgan adım.
+  parseJSONResponse,
+  extractBalancedJSON,
 };
